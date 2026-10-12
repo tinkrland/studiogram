@@ -106,7 +106,20 @@ const pinnedB = await shot();
 const reproduceRatio = diffRatio(pinnedA, pinnedB);
 check("pinned shot reproduces its framing exactly", reproduceRatio < 0.01, `${(reproduceRatio * 100).toFixed(2)}% differ`);
 
-// 6. a capture taken pinned records the pinned camera
+// 6. unload flush: a drag mid-damping has not been persisted yet (the
+//    debounce saves on quiet); beforeunload must flush it synchronously
+await clickText("free orbit");
+await drag(240, -160);
+const stale = await page.evaluate(() => JSON.parse(localStorage.getItem("studiogram_state")).live.position);
+await page.evaluate(() => dispatchEvent(new Event("beforeunload")));
+const flushed = await page.evaluate(() => JSON.parse(localStorage.getItem("studiogram_state")).live.position);
+check("unload flushes pending camera state", JSON.stringify(stale) !== JSON.stringify(flushed),
+  `stale ${JSON.stringify(stale)} -> flushed ${JSON.stringify(flushed)}`);
+
+// 7. a capture taken pinned records the pinned camera
+await clickText("go");
+await new Promise((r) => setTimeout(r, 400));
+check("back to pinned for the capture", (await page.$eval("#vpmode", (e) => e.textContent)) === "pinned: qa pin");
 await page.click("#btn-capture");
 await new Promise((r) => setTimeout(r, 1500));
 const strip = await page.evaluate(() => document.querySelector("#capstrip")?.textContent || "");

@@ -747,6 +747,13 @@ function saveState() {
     try { localStorage.setItem("studiogram_state", JSON.stringify(serializeState(true))); } catch (e) { /* storage full: keep captures lean */ }
   }, 350);
 }
+// orbiting fires change events every frame, so the 350ms debounce coalesces
+// them into a save-on-quiet. that means a tab closed mid-motion would lose
+// its last move — flush synchronously on unload to close that window.
+window.addEventListener("beforeunload", () => {
+  clearTimeout(saveState._t);
+  try { localStorage.setItem("studiogram_state", JSON.stringify(serializeState(true))); } catch (e) {}
+});
 // ===== saved hand configurations: a creator asset, not scene state =====
 // a saved hand keeps the complete shape-plus-surface set: presentation,
 // build morphs, finish, tone, hair, and painted tattoos. pose and jewelry
