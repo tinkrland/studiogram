@@ -125,6 +125,19 @@ await new Promise((r) => setTimeout(r, 1500));
 const strip = await page.evaluate(() => document.querySelector("#capstrip")?.textContent || "");
 check("capture recorded as pinned", /pinned/.test(strip), "capture strip entry says pinned");
 
+// 8. a catalog add during pinned mode animates objects, never the view
+const camBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("studiogram_state")).live.position.join(","));
+await page.click('#tabs button[data-tab="jewelry"]');
+await new Promise((r) => setTimeout(r, 300));
+await clickText("add to scene");
+await new Promise((r) => setTimeout(r, 800));
+const liveAfter = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem("studiogram_state"));
+  return { pos: st.live.position.join(","), mode: st.live.mode };
+});
+check("catalog add kept the camera pinned", liveAfter.mode === "pinned", "mode still pinned");
+check("catalog add did not move the camera", liveAfter.pos === camBefore, `camera ${camBefore} -> ${liveAfter.pos}`);
+
 console.log(fails.length ? `\n${fails.length} FAILURES: ${fails.join(", ")}` : "\nall drag qa checks passed");
 await browser.close();
 process.exit(fails.length ? 1 : 0);

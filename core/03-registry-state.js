@@ -107,7 +107,7 @@ const BACKDROPS = {
 
 function defaultState() {
   return {
-    schema: "studiogram-scene-state", state_version: 1,
+    schema: "studiogram-scene-state", state_version: 2,
     hand: defaultHand(),
     pose: defaultPose(),
     jewelry: [],
@@ -115,7 +115,9 @@ function defaultState() {
     environment: { ...BACKDROPS.warm_gray, preset: "warm_gray" }, // bg/center are the values that render; a preset is a prefill, not a path
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },
     cameras: [],
-    captures: [],
+    photos: [],          // the photo collection: immutable records of taken frames
+    sets: [{ id: "set1", name: "shoot 1", photo_ids: [] }],
+    active_set: "set1",
   };
 }
 let S = defaultState();
@@ -222,11 +224,11 @@ function deleteSavedHand(cfg) {
 
 // captures keep a thumbnail in saved state; full png frames live in memory only.
 function serializeState(withThumbs) {
-  const caps = S.captures.map((c) => {
-    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot };
+  const photos = S.photos.map((c) => {
+    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot, gate: c.gate || [] };
     if (withThumbs && CAPTURE_THUMBS[c.id]) o.thumb = CAPTURE_THUMBS[c.id];
     return o;
   });
-  return { ...S, captures: caps };
+  return { ...S, captures: undefined, photos };
 }
 

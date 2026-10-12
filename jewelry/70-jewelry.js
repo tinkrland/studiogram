@@ -72,6 +72,121 @@ function metalMaterial(metalKey) {
   });
 }
 
+// the scene mimics how jewelry is actually worn: a ring slides on over the
+// fingertip, a bracelet comes over the knuckles. the slide is a pure derived
+// function of the final state — constants live here in code, timing never
+// enters scene state, and skipping it lands on the exact same state.
+const SLIDE_MS = 450;
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+function slideOnEnabled() {
+  if (localStorage.getItem("studiogram_transitions") === "off") return false;
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function pieceWidthMm(rec) {
+  const spec = rec.parameters.mesh_spec;
+  if (spec.kind === "cuff") return Math.round((spec.tube_mm * 2 + spec.arc_deg / 360 * Math.PI * (spec.inner_radius_mm + spec.tube_mm) * 0.5) * 10) / 10;
+  return spec.width_mm || spec.band_width_mm || 4;
+}
+function pieceRecord(inst) { return byRelease.get(inst.release_id) || null; }
+// the fit band: a seat range derived from the same boneLen the placement
+// uses, so seats are true to each finger. the band is [0, max] in mm beyond
+// the 55% seat point; the piece must fit below the fingertip with clearance.
+function seatBandMaxMm(inst) {
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const len = (HAND.boneLen.get(key) || 0.045) * 1000; // mm
+  const rec = pieceRecord(inst);
+  const w = rec ? pieceWidthMm(rec) : 4;
+  return Math.round(((len * 0.45) - w - 1.5) * 10) / 10;
+}
+// collision clamp: a piece's slide stops where its band meets the adjacent
+// piece's occupied band (offset + width + 0.25mm clearance), and never
+// leaves the fit band. pressing toward the hand seats it at contact.
+function clampSeatMm(inst, target, dirHint) {
+  const rec = pieceRecord(inst);
+  const w = rec ? pieceWidthMm(rec) : 4;
+  const band = seatBandMaxMm(inst);
+  const dir = dirHint !== undefined ? dirHint : Math.sign(target - inst.offset_mm);
+  let t = Math.round(target * 10) / 10;
+  for (const o of S.jewelry) {
+    if (o === inst || o.location.kind !== inst.location.kind || o.location.finger !== inst.location.finger) continue;
+    const orec = pieceRecord(o);
+    const ow = orec ? pieceWidthMm(orec) : 4;
+    const overlaps = t < o.offset_mm + ow + 0.25 && t + w + 0.25 > o.offset_mm;
+    if (!overlaps) continue;
+    t = dir < 0 ? o.offset_mm - w - 0.25 : o.offset_mm + ow + 0.25;
+    t = Math.round(t * 10) / 10;
+  }
+  if (t < 0) t = 0;
+  if (t > band) t = band;
+  return t;
+}
+// state change: clamp, write offset_mm, present it as a slide. offset_mm stays
+// the single quantitative truth; the slide is how the change is shown.
+function applySeat(inst, target) {
+  const t = clampSeatMm(inst, target);
+  const from = inst.offset_mm;
+  if (t !== from) {
+    inst.offset_mm = t;
+    slideSeat(inst, from, t);
+    saveState();
+  }
+  return t;
+}
+// view-layer tween. a placement from anywhere else cancels it: the state is
+// the truth and the tween is always catchable-killable.
+function tweenSeat(inst, fromY, toY, done) {
+  const j = JEWELRY.get(inst.iid);
+  if (!j) { if (done) done(); return; }
+  if (j.tween) cancelAnimationFrame(j.tween);
+  if (!slideOnEnabled()) { j.group.position.y = toY; if (done) done(); return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / SLIDE_MS);
+    j.group.position.y = fromY + (toY - fromY) * easeOutCubic(k);
+    if (k < 1) j.tween = requestAnimationFrame(step);
+    else { j.tween = null; if (done) done(); }
+  };
+  j.tween = requestAnimationFrame(step);
+}
+function seatY(inst, offset) {
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const len = HAND.boneLen.get(key) || 0.045;
+  return len * 0.55 + offset * 0.001;
+}
+// the physical insertion: from beyond the extremity along the bone axis down
+// to the seat. wrist pieces come over the knuckles the same way.
+function slideOnInstance(inst) {
+  const j = JEWELRY.get(inst.iid);
+  if (!j) return;
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const overshoot = (HAND.boneLen.get(key) || 0.045);
+  const toY = seatY(inst, inst.offset_mm);
+  j.group.position.y = toY + overshoot;
+  tweenSeat(inst, toY + overshoot, toY);
+}
+// a photo records exactly what the state says: any slide still in flight
+// settles to its final position before a take renders
+function settleSlides() {
+  for (const [iid, j] of JEWELRY) {
+    if (!j.tween) continue;
+    const inst = S.jewelry.find((x) => x.iid === iid);
+    if (inst) placeJewelryInstance(inst); // land on its seat
+    else removeJewelryMesh(iid);          // a departing piece settles as gone
+  }
+}
+function slideSeat(inst, from, to) {
+  tweenSeat(inst, seatY(inst, from), seatY(inst, to));
+}
+function slideOffInstance(inst, done) {
+  const j = JEWELRY.get(inst.iid);
+  if (!j) { if (done) done(); return; }
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const overshoot = (HAND.boneLen.get(key) || 0.045);
+  const fromY = j.group.position.y;
+  if (!slideOnEnabled()) { if (done) done(); return; }
+  tweenSeat(inst, fromY, fromY + overshoot, done);
+}
+
 async function addJewelryInstance(releaseId, metalKey) {
   await buildHand(); // the model must be loaded before anything can attach to a bone
   const rec = byRelease.get(releaseId);
@@ -85,7 +200,7 @@ async function addJewelryInstance(releaseId, metalKey) {
   const iid = "j" + Math.random().toString(36).slice(2, 9);
   // stacking: default offset grows with pieces already at this location
   const already = S.jewelry.filter((x) => x.location.kind === location.kind && x.location.finger === location.finger).length;
-  const w = (rec.parameters.mesh_spec.width_mm || rec.parameters.mesh_spec.band_width_mm || 4);
+  const w = pieceWidthMm(rec);
   const inst = {
     iid, release_id: releaseId, version: rec.version,
     mesh_sha256: rec.assets.mesh_sha256,
@@ -93,8 +208,17 @@ async function addJewelryInstance(releaseId, metalKey) {
     metal: metalKey && rec.metals_offered.includes(metalKey) ? metalKey : rec.metals_offered[0],
     location, offset_mm: Math.round(already * (w + 0.5) * 10) / 10, rotation_deg: 0
   };
+  // a piece whose band is wider than the finger's fit band has no valid
+  // placement: refused at add time, plain reason, no gate entry
+  const band = seatBandMaxMm(inst);
+  if (band < 0) {
+    toast(`${rec.name} cannot seat on the ${location.finger} finger: the fit band is narrower than the piece`);
+    return;
+  }
+  inst.offset_mm = clampSeatMm(inst, inst.offset_mm);
   S.jewelry.push(inst);
   await buildJewelryInstance(inst);
+  slideOnInstance(inst);
   renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay(); saveState();
   toast(`${rec.name} v${rec.version} added to scene by reference`);
 }
@@ -146,6 +270,7 @@ function placeJewelryInstance(inst) {
   // bone space is meters (the model's native units); artifact geometry is
   // millimeters, so the group shrinks a thousandfold to sit true to size.
   j.group.scale.setScalar(0.001);
+  if (j.tween) { cancelAnimationFrame(j.tween); j.tween = null; }
   j.group.position.set(0, len * 0.55 + inst.offset_mm * 0.001, 0);
   j.group.rotation.y = inst.rotation_deg * DEG;
 }
@@ -171,16 +296,26 @@ function reorderJewelry(iid, dir) {
   const j = dir === "hand" ? i - 1 : i + 1;
   if (j < 0 || j >= stack.length) return false;
   const a = inst.offset_mm;
-  inst.offset_mm = stack[j].offset_mm;
-  stack[j].offset_mm = a;
-  placeJewelryInstance(inst); placeJewelryInstance(stack[j]);
+  const b = stack[j].offset_mm;
+  inst.offset_mm = b; stack[j].offset_mm = a;
+  // exchanged seats clamp at contact when the two bands would now overlap
+  inst.offset_mm = clampSeatMm(inst, inst.offset_mm, dir === "hand" ? -1 : 1);
+  slideSeat(inst, a, inst.offset_mm);
+  slideSeat(stack[j], b, stack[j].offset_mm);
   saveState();
   return true;
 }
 function removeJewelryInstance(iid) {
-  removeJewelryMesh(iid);
+  const inst = S.jewelry.find((x) => x.iid === iid);
   S.jewelry = S.jewelry.filter((x) => x.iid !== iid);
-  renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay(); saveState();
+  saveState();
+  renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay();
+  if (inst && JEWELRY.get(iid)) {
+    // the piece slides off along the same path it came in on
+    slideOffInstance(inst, () => removeJewelryMesh(iid));
+  } else {
+    removeJewelryMesh(iid);
+  }
 }
 function supportedLocations(rec) {
   return rec.parameters.placement.locations; // e.g. ["finger"] or ["wrist"]

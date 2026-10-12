@@ -19,7 +19,7 @@ function bname(s) { return s.replace(/\./g, ""); }
 
 const HAND = {
   root: null, model: null, skinned: null,
-  bones: new Map(), bind: new Map(), boneLen: new Map(), poseBones: {},
+  bones: new Map(), bind: new Map(), boneLen: new Map(), fingerR: new Map(), poseBones: {},
   loaded: false, boneCount: 0,
   source: {
     title: "Rigged Hand", author: "DennisH2010",
@@ -78,6 +78,42 @@ async function loadHandModel() {
     for (const [boneName, d] of Object.entries(deltas)) norm[bname(boneName)] = d;
     HAND.poseBones[poseName] = norm;
   }
+  computeFingerRadii();
   HAND.loaded = true;
   applyFinish();
+}
+// per-finger skin radius at the seat height: eight inward rays cast around
+// the bone, in bind pose, once at load. advisory fit hints read this; it is
+// never a gate and never state.
+function computeFingerRadii() {
+  if (!HAND.skinned) return;
+  scene.updateMatrixWorld(true);
+  const rc = new THREE.Raycaster();
+  rc.far = 0.03;
+  const axis = new THREE.Vector3();
+  const wp = new THREE.Vector3();
+  const rd = new THREE.Vector3();
+  const q = new THREE.Quaternion();
+  for (const key of [...Object.keys(FINGER_BONES), "wrist"]) {
+    const bone = key === "wrist" ? HAND.bones.get(bname("forearm.L")) : boneFor({ kind: "finger", finger: key });
+    if (!bone) continue;
+    const len = HAND.boneLen.get(key) || 0.045;
+    wp.set(0, len * 0.55, 0); bone.localToWorld(wp);
+    bone.getWorldQuaternion(q); axis.set(0, 1, 0).applyQuaternion(q);
+    const hits = [];
+    for (let k = 0; k < 8; k++) {
+      rd.set(Math.cos(k * Math.PI / 4), 0, Math.sin(k * Math.PI / 4));
+      rd.sub(axis.clone().multiplyScalar(rd.dot(axis)));
+      if (rd.lengthSq() < 1e-9) continue;
+      rd.normalize();
+      const origin = wp.clone().addScaledVector(rd, 0.03);
+      rc.set(origin, rd.clone().negate());
+      const h = rc.intersectObject(HAND.skinned, false)[0];
+      if (h) hits.push(0.03 - h.distance);
+    }
+    if (hits.length) {
+      const rmm = (hits.reduce((a, b) => a + b, 0) / hits.length) * 1000;
+      HAND.fingerR.set(key, Math.round(rmm * 10) / 10);
+    }
+  }
 }

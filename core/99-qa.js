@@ -22,6 +22,7 @@ async function runSelfTest() {
   let mesh = null;
   g.traverse((o) => { if (o.isMesh) mesh = o; });
   if (mesh) mesh.material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+  settleSlides(); // probes measure the seated piece, not a mid-slide view
   renderFrame();
   camera.updateMatrixWorld();
   g.updateWorldMatrix(true, true);
@@ -66,6 +67,71 @@ async function runSelfTest() {
   let green = 0;
   for (let i = 0; i < dE.length; i += 4) if (dE[i] > 40 && dE[i] < 100 && dE[i + 1] > 80 && dE[i + 2] < 90) green++;
   results.push("manual backdrop green pixels: " + green);
+
+  // seat clamp: pressing a piece toward the hand into an occupied band seats
+  // it at contact clearance (neighbor offset + width + 0.25mm)
+  const clamped = applySeat(second, first.offset_mm);
+  const expectSeat = Math.round((first.offset_mm + pieceWidthMm(byRelease.get(first.release_id)) + 0.25) * 10) / 10;
+  results.push("seat clamp at contact: " + clamped.toFixed(1) + " (expected " + expectSeat.toFixed(1) + ")");
+  applySeat(second, 0); // restore the stack order for the rest of the run
+
+  // slide-on transitions are view-only: transition-on and transition-off
+  // adds end at identical state hashes. iids are random identifiers, not
+  // quantitative truth, so the comparison normalizes them away.
+  const normalizedState = () => JSON.parse(JSON.stringify(sceneCoreState(), (k, v) => (k === "iid" ? "j" : v)));
+  localStorage.setItem("studiogram_transitions", "off");
+  await addJewelryInstance(REGISTRY[2].release_id, "silver_925");
+  const third = S.jewelry[2];
+  const hashNoSlide = await sha256hex(normalizedState());
+  removeJewelryInstance(third.iid);
+  localStorage.setItem("studiogram_transitions", "on");
+  await addJewelryInstance(REGISTRY[2].release_id, "silver_925");
+  const hashSlide = await sha256hex(normalizedState());
+  removeJewelryInstance(S.jewelry[2].iid);
+  results.push("transition on/off hashes equal: " + (hashNoSlide === hashSlide));
+
+  // photos: a photo from a named camera keeps the take-time values. reframe
+  // the camera afterwards, reproduce, and the frame must not change.
+  // the magenta paint above was a view-only probe: rebuild the piece from
+  // state first, or the repro would rightly restore the real material.
+  await buildJewelryInstance(first);
+  S.cameras.push({ name: "selftest cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
+  S.live = { ...S.live, mode: "pinned", pinned: "selftest cam" };
+  syncModeBadge();
+  const photo = await captureFrame();
+  const photoBackToBack = await captureFrame();
+  results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
+  deleteCapture(photoBackToBack);
+  results.push("photo camera name: " + photo.camera.name + ", mode: " + photo.camera.mode);
+  results.push("photo gate record: " + JSON.stringify(photo.gate));
+  const takePng = CAPTURE_IMG.get(photo.id);
+  S.cameras.find((c) => c.name === "selftest cam").position = [300, 400, 500];
+  S.cameras.find((c) => c.name === "selftest cam").fov = 40;
+  await reproduceCapture(photo);
+  const reproPng = CAPTURE_IMG.get(photo.id);
+  results.push("photo survives camera reframe (values are truth): " + (takePng === reproPng));
+  if (takePng !== reproPng) {
+    const px = async (url) => { const i = await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.src = url; }); const c = document.createElement("canvas"); c.width = c.height = 400; const x = c.getContext("2d"); x.drawImage(i, 0, 0, 400, 400); return x.getImageData(0, 0, 400, 400).data; };
+    const a = await px(takePng), b = await px(reproPng);
+    let diff = 0;
+    for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) > 8 || Math.abs(a[i + 1] - b[i + 1]) > 8 || Math.abs(a[i + 2] - b[i + 2]) > 8) diff++;
+    results.push("photo take-vs-repro diff pixels: " + diff);
+  }
+
+  // capture sets: per-set numbering, and export filenames derive from set + photo
+  S.sets.push({ id: "set2", name: "detail study", photo_ids: [] });
+  S.active_set = "set2";
+  const photo2 = await captureFrame();
+  results.push("second set numbering restarts: " + photo2.name + " in " + activeSet().name);
+  results.push("export filename: " + exportFilename(photo2));
+  S.active_set = "set1";
+  S.cameras = S.cameras.filter((c) => c.name !== "selftest cam");
+  S.live = { ...S.live, mode: "orbit" };
+  controls.enabled = true; syncModeBadge();
+  deleteCapture(photo);
+  deleteCapture(photo2);
+  S.sets = S.sets.filter((x) => x.id !== "set2");
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -83,6 +149,8 @@ async function runSceneAudit() {
   results.push("live: " + JSON.stringify({ position: S.live.position, target: S.live.target, mode: S.live.mode }));
   results.push("pose preset: " + S.pose.preset + ", wrist: " + JSON.stringify(S.pose.wrist));
   results.push("environment: preset " + S.environment.preset + ", edge " + S.environment.bg + ", center " + S.environment.center);
+  results.push("capture sets: " + S.sets.map((x) => x.name + " (" + x.photo_ids.length + ")").join(", ") + " · active: " + activeSet().name);
+  results.push("finger radii mm: " + (HAND.fingerR.size ? [...HAND.fingerR].map(([f, r]) => f.slice(0, 3) + " " + r.toFixed(1)).join(" ") : "not sampled"));
   if (HAND.loaded) {
     HAND.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(HAND.model);

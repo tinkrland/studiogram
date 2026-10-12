@@ -474,7 +474,7 @@ const BACKDROPS = {
 
 function defaultState() {
   return {
-    schema: "studiogram-scene-state", state_version: 1,
+    schema: "studiogram-scene-state", state_version: 2,
     hand: defaultHand(),
     pose: defaultPose(),
     jewelry: [],
@@ -482,7 +482,9 @@ function defaultState() {
     environment: { ...BACKDROPS.warm_gray, preset: "warm_gray" }, // bg/center are the values that render; a preset is a prefill, not a path
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },
     cameras: [],
-    captures: [],
+    photos: [],          // the photo collection: immutable records of taken frames
+    sets: [{ id: "set1", name: "shoot 1", photo_ids: [] }],
+    active_set: "set1",
   };
 }
 let S = defaultState();
@@ -589,12 +591,12 @@ function deleteSavedHand(cfg) {
 
 // captures keep a thumbnail in saved state; full png frames live in memory only.
 function serializeState(withThumbs) {
-  const caps = S.captures.map((c) => {
-    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot };
+  const photos = S.photos.map((c) => {
+    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot, gate: c.gate || [] };
     if (withThumbs && CAPTURE_THUMBS[c.id]) o.thumb = CAPTURE_THUMBS[c.id];
     return o;
   });
-  return { ...S, captures: caps };
+  return { ...S, captures: undefined, photos };
 }
 
 // ===== renderer, scene, lighting, backdrop, dof composite =====
@@ -1208,7 +1210,7 @@ function bname(s) { return s.replace(/\./g, ""); }
 
 const HAND = {
   root: null, model: null, skinned: null,
-  bones: new Map(), bind: new Map(), boneLen: new Map(), poseBones: {},
+  bones: new Map(), bind: new Map(), boneLen: new Map(), fingerR: new Map(), poseBones: {},
   loaded: false, boneCount: 0,
   source: {
     title: "Rigged Hand", author: "DennisH2010",
@@ -1267,8 +1269,44 @@ async function loadHandModel() {
     for (const [boneName, d] of Object.entries(deltas)) norm[bname(boneName)] = d;
     HAND.poseBones[poseName] = norm;
   }
+  computeFingerRadii();
   HAND.loaded = true;
   applyFinish();
+}
+// per-finger skin radius at the seat height: eight inward rays cast around
+// the bone, in bind pose, once at load. advisory fit hints read this; it is
+// never a gate and never state.
+function computeFingerRadii() {
+  if (!HAND.skinned) return;
+  scene.updateMatrixWorld(true);
+  const rc = new THREE.Raycaster();
+  rc.far = 0.03;
+  const axis = new THREE.Vector3();
+  const wp = new THREE.Vector3();
+  const rd = new THREE.Vector3();
+  const q = new THREE.Quaternion();
+  for (const key of [...Object.keys(FINGER_BONES), "wrist"]) {
+    const bone = key === "wrist" ? HAND.bones.get(bname("forearm.L")) : boneFor({ kind: "finger", finger: key });
+    if (!bone) continue;
+    const len = HAND.boneLen.get(key) || 0.045;
+    wp.set(0, len * 0.55, 0); bone.localToWorld(wp);
+    bone.getWorldQuaternion(q); axis.set(0, 1, 0).applyQuaternion(q);
+    const hits = [];
+    for (let k = 0; k < 8; k++) {
+      rd.set(Math.cos(k * Math.PI / 4), 0, Math.sin(k * Math.PI / 4));
+      rd.sub(axis.clone().multiplyScalar(rd.dot(axis)));
+      if (rd.lengthSq() < 1e-9) continue;
+      rd.normalize();
+      const origin = wp.clone().addScaledVector(rd, 0.03);
+      rc.set(origin, rd.clone().negate());
+      const h = rc.intersectObject(HAND.skinned, false)[0];
+      if (h) hits.push(0.03 - h.distance);
+    }
+    if (hits.length) {
+      const rmm = (hits.reduce((a, b) => a + b, 0) / hits.length) * 1000;
+      HAND.fingerR.set(key, Math.round(rmm * 10) / 10);
+    }
+  }
 }
 
 // morphology: seven authored blend targets on the single base mesh drive
@@ -1722,6 +1760,121 @@ function metalMaterial(metalKey) {
   });
 }
 
+// the scene mimics how jewelry is actually worn: a ring slides on over the
+// fingertip, a bracelet comes over the knuckles. the slide is a pure derived
+// function of the final state — constants live here in code, timing never
+// enters scene state, and skipping it lands on the exact same state.
+const SLIDE_MS = 450;
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+function slideOnEnabled() {
+  if (localStorage.getItem("studiogram_transitions") === "off") return false;
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function pieceWidthMm(rec) {
+  const spec = rec.parameters.mesh_spec;
+  if (spec.kind === "cuff") return Math.round((spec.tube_mm * 2 + spec.arc_deg / 360 * Math.PI * (spec.inner_radius_mm + spec.tube_mm) * 0.5) * 10) / 10;
+  return spec.width_mm || spec.band_width_mm || 4;
+}
+function pieceRecord(inst) { return byRelease.get(inst.release_id) || null; }
+// the fit band: a seat range derived from the same boneLen the placement
+// uses, so seats are true to each finger. the band is [0, max] in mm beyond
+// the 55% seat point; the piece must fit below the fingertip with clearance.
+function seatBandMaxMm(inst) {
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const len = (HAND.boneLen.get(key) || 0.045) * 1000; // mm
+  const rec = pieceRecord(inst);
+  const w = rec ? pieceWidthMm(rec) : 4;
+  return Math.round(((len * 0.45) - w - 1.5) * 10) / 10;
+}
+// collision clamp: a piece's slide stops where its band meets the adjacent
+// piece's occupied band (offset + width + 0.25mm clearance), and never
+// leaves the fit band. pressing toward the hand seats it at contact.
+function clampSeatMm(inst, target, dirHint) {
+  const rec = pieceRecord(inst);
+  const w = rec ? pieceWidthMm(rec) : 4;
+  const band = seatBandMaxMm(inst);
+  const dir = dirHint !== undefined ? dirHint : Math.sign(target - inst.offset_mm);
+  let t = Math.round(target * 10) / 10;
+  for (const o of S.jewelry) {
+    if (o === inst || o.location.kind !== inst.location.kind || o.location.finger !== inst.location.finger) continue;
+    const orec = pieceRecord(o);
+    const ow = orec ? pieceWidthMm(orec) : 4;
+    const overlaps = t < o.offset_mm + ow + 0.25 && t + w + 0.25 > o.offset_mm;
+    if (!overlaps) continue;
+    t = dir < 0 ? o.offset_mm - w - 0.25 : o.offset_mm + ow + 0.25;
+    t = Math.round(t * 10) / 10;
+  }
+  if (t < 0) t = 0;
+  if (t > band) t = band;
+  return t;
+}
+// state change: clamp, write offset_mm, present it as a slide. offset_mm stays
+// the single quantitative truth; the slide is how the change is shown.
+function applySeat(inst, target) {
+  const t = clampSeatMm(inst, target);
+  const from = inst.offset_mm;
+  if (t !== from) {
+    inst.offset_mm = t;
+    slideSeat(inst, from, t);
+    saveState();
+  }
+  return t;
+}
+// view-layer tween. a placement from anywhere else cancels it: the state is
+// the truth and the tween is always catchable-killable.
+function tweenSeat(inst, fromY, toY, done) {
+  const j = JEWELRY.get(inst.iid);
+  if (!j) { if (done) done(); return; }
+  if (j.tween) cancelAnimationFrame(j.tween);
+  if (!slideOnEnabled()) { j.group.position.y = toY; if (done) done(); return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / SLIDE_MS);
+    j.group.position.y = fromY + (toY - fromY) * easeOutCubic(k);
+    if (k < 1) j.tween = requestAnimationFrame(step);
+    else { j.tween = null; if (done) done(); }
+  };
+  j.tween = requestAnimationFrame(step);
+}
+function seatY(inst, offset) {
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const len = HAND.boneLen.get(key) || 0.045;
+  return len * 0.55 + offset * 0.001;
+}
+// the physical insertion: from beyond the extremity along the bone axis down
+// to the seat. wrist pieces come over the knuckles the same way.
+function slideOnInstance(inst) {
+  const j = JEWELRY.get(inst.iid);
+  if (!j) return;
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const overshoot = (HAND.boneLen.get(key) || 0.045);
+  const toY = seatY(inst, inst.offset_mm);
+  j.group.position.y = toY + overshoot;
+  tweenSeat(inst, toY + overshoot, toY);
+}
+// a photo records exactly what the state says: any slide still in flight
+// settles to its final position before a take renders
+function settleSlides() {
+  for (const [iid, j] of JEWELRY) {
+    if (!j.tween) continue;
+    const inst = S.jewelry.find((x) => x.iid === iid);
+    if (inst) placeJewelryInstance(inst); // land on its seat
+    else removeJewelryMesh(iid);          // a departing piece settles as gone
+  }
+}
+function slideSeat(inst, from, to) {
+  tweenSeat(inst, seatY(inst, from), seatY(inst, to));
+}
+function slideOffInstance(inst, done) {
+  const j = JEWELRY.get(inst.iid);
+  if (!j) { if (done) done(); return; }
+  const key = inst.location.kind === "wrist" ? "wrist" : inst.location.finger;
+  const overshoot = (HAND.boneLen.get(key) || 0.045);
+  const fromY = j.group.position.y;
+  if (!slideOnEnabled()) { if (done) done(); return; }
+  tweenSeat(inst, fromY, fromY + overshoot, done);
+}
+
 async function addJewelryInstance(releaseId, metalKey) {
   await buildHand(); // the model must be loaded before anything can attach to a bone
   const rec = byRelease.get(releaseId);
@@ -1735,7 +1888,7 @@ async function addJewelryInstance(releaseId, metalKey) {
   const iid = "j" + Math.random().toString(36).slice(2, 9);
   // stacking: default offset grows with pieces already at this location
   const already = S.jewelry.filter((x) => x.location.kind === location.kind && x.location.finger === location.finger).length;
-  const w = (rec.parameters.mesh_spec.width_mm || rec.parameters.mesh_spec.band_width_mm || 4);
+  const w = pieceWidthMm(rec);
   const inst = {
     iid, release_id: releaseId, version: rec.version,
     mesh_sha256: rec.assets.mesh_sha256,
@@ -1743,8 +1896,17 @@ async function addJewelryInstance(releaseId, metalKey) {
     metal: metalKey && rec.metals_offered.includes(metalKey) ? metalKey : rec.metals_offered[0],
     location, offset_mm: Math.round(already * (w + 0.5) * 10) / 10, rotation_deg: 0
   };
+  // a piece whose band is wider than the finger's fit band has no valid
+  // placement: refused at add time, plain reason, no gate entry
+  const band = seatBandMaxMm(inst);
+  if (band < 0) {
+    toast(`${rec.name} cannot seat on the ${location.finger} finger: the fit band is narrower than the piece`);
+    return;
+  }
+  inst.offset_mm = clampSeatMm(inst, inst.offset_mm);
   S.jewelry.push(inst);
   await buildJewelryInstance(inst);
+  slideOnInstance(inst);
   renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay(); saveState();
   toast(`${rec.name} v${rec.version} added to scene by reference`);
 }
@@ -1796,6 +1958,7 @@ function placeJewelryInstance(inst) {
   // bone space is meters (the model's native units); artifact geometry is
   // millimeters, so the group shrinks a thousandfold to sit true to size.
   j.group.scale.setScalar(0.001);
+  if (j.tween) { cancelAnimationFrame(j.tween); j.tween = null; }
   j.group.position.set(0, len * 0.55 + inst.offset_mm * 0.001, 0);
   j.group.rotation.y = inst.rotation_deg * DEG;
 }
@@ -1821,16 +1984,26 @@ function reorderJewelry(iid, dir) {
   const j = dir === "hand" ? i - 1 : i + 1;
   if (j < 0 || j >= stack.length) return false;
   const a = inst.offset_mm;
-  inst.offset_mm = stack[j].offset_mm;
-  stack[j].offset_mm = a;
-  placeJewelryInstance(inst); placeJewelryInstance(stack[j]);
+  const b = stack[j].offset_mm;
+  inst.offset_mm = b; stack[j].offset_mm = a;
+  // exchanged seats clamp at contact when the two bands would now overlap
+  inst.offset_mm = clampSeatMm(inst, inst.offset_mm, dir === "hand" ? -1 : 1);
+  slideSeat(inst, a, inst.offset_mm);
+  slideSeat(stack[j], b, stack[j].offset_mm);
   saveState();
   return true;
 }
 function removeJewelryInstance(iid) {
-  removeJewelryMesh(iid);
+  const inst = S.jewelry.find((x) => x.iid === iid);
   S.jewelry = S.jewelry.filter((x) => x.iid !== iid);
-  renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay(); saveState();
+  saveState();
+  renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay();
+  if (inst && JEWELRY.get(iid)) {
+    // the piece slides off along the same path it came in on
+    slideOffInstance(inst, () => removeJewelryMesh(iid));
+  } else {
+    removeJewelryMesh(iid);
+  }
 }
 function supportedLocations(rec) {
   return rec.parameters.placement.locations; // e.g. ["finger"] or ["wrist"]
@@ -2084,7 +2257,21 @@ function renderJewelryPanel() {
   PANEL.innerHTML = "";
   const reg = section(PANEL, "release registry");
   hint(reg, "releases enter scenes by reference: id, version, asset hash. this gate checks provenance and visual reliability only. it is never a castability, safety, or quality claim; product geometry validation belongs to the studio's release gate upstream.");
+  const prefRow = el("div", "row");
+  const tog = document.createElement("input"); tog.type = "checkbox"; tog.checked = slideOnEnabled();
+  tog.addEventListener("change", () => localStorage.setItem("studiogram_transitions", tog.checked ? "on" : "off"));
+  prefRow.append(el("label", null, "slide-on transitions"), tog);
+  reg.appendChild(prefRow);
+  // artist catalog grouping: cross-creator scenes are the norm, so each
+  // artist's catalog reads as its own section
+  const byArtist = new Map();
   for (const rec of REGISTRY) {
+    if (!byArtist.has(rec.creator_name)) byArtist.set(rec.creator_name, []);
+    byArtist.get(rec.creator_name).push(rec);
+  }
+  for (const [artist, recs] of byArtist) {
+    const cat = section(PANEL, artist + " — catalog");
+    for (const rec of recs) {
     const card = el("div", "card");
     const t = el("div", "t");
     t.appendChild(el("b", null, `${rec.name}`));
@@ -2109,7 +2296,8 @@ function renderJewelryPanel() {
     addBtn.addEventListener("click", () => addJewelryInstance(rec.release_id, metalSel.value));
     actions.append(metalSel, addBtn);
     card.appendChild(actions);
-    reg.appendChild(card);
+    cat.appendChild(card);
+    }
   }
 
   const inst = section(PANEL, "arrangement");
@@ -2150,7 +2338,15 @@ function renderJewelryPanel() {
       fRow.append(el("label", null, "at"), fingerSel);
       card.appendChild(fRow);
     }
-    slider(card, "seat offset", 0, 14, 0.1, () => j.offset_mm, (v) => { j.offset_mm = v; }, { apply: () => placeJewelryInstance(j), fmt: (v) => v.toFixed(1) });
+    // the seat range is the finger's derived fit band, not a fixed slider span
+    slider(card, "seat offset", 0, Math.max(seatBandMaxMm(j), 0.1), 0.1, () => j.offset_mm, (v) => { j._seat = v; }, { apply: () => { applySeat(j, j._seat === undefined ? j.offset_mm : j._seat); renderJewelryPanel(); }, fmt: (v) => v.toFixed(1) });
+    // fit is advisory, never a gate: the scene is a photograph, not a fitting
+    const fr = j.location.kind === "finger" && HAND.fingerR ? HAND.fingerR.get(j.location.finger) : null;
+    const ri = rec && rec.parameters.mesh_spec ? rec.parameters.mesh_spec.inner_radius_mm : null;
+    if (fr && ri) {
+      if (ri < fr - 1.2) card.appendChild(el("div", "hash", `advisory: wears tight on this finger (${ri.toFixed(1)}mm inner vs ${fr.toFixed(1)}mm finger)`));
+      else if (ri > fr + 1.8) card.appendChild(el("div", "hash", `advisory: sits loose, below the knuckle line (${ri.toFixed(1)}mm inner vs ${fr.toFixed(1)}mm finger)`));
+    }
     slider(card, "rotation", -180, 180, 1, () => j.rotation_deg, (v) => { j.rotation_deg = v; }, { apply: () => placeJewelryInstance(j), fmt: (v) => v.toFixed(0) });
     const metalSel = document.createElement("select");
     const rec2 = byRelease.get(j.release_id);
@@ -2382,9 +2578,12 @@ function renderPanel(tab) {
 }
 document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => renderPanel(b.dataset.tab)));
 
-// ===== capture set, persistence, boot =====
-const CAPTURE_IMG = new Map();   // capture id -> full png data url (memory only, never state)
-const CAPTURE_THUMBS = new Map(); // capture id -> small jpeg data url
+// ===== photos and capture sets =====
+// a photo is an immutable record of exactly what rendered, from exactly where,
+// over exactly what scene state. cameras are mutable scene things; a photo
+// keeps the values it was taken with, and the camera name only as provenance.
+const CAPTURE_IMG = new Map();   // photo id -> full png data url (memory only, never state)
+const CAPTURE_THUMBS = new Map(); // photo id -> small jpeg data url
 
 function sceneCoreState() {
   return JSON.parse(JSON.stringify({
@@ -2417,34 +2616,59 @@ function makeThumb(png) {
   });
 }
 
+function activeSet() { return S.sets.find((x) => x.id === S.active_set) || S.sets[0]; }
+function photosInSet(set) {
+  return (set.photo_ids || []).map((id) => S.photos.find((p) => p.id === id)).filter(Boolean);
+}
+
+// the gate array records which release references were verified when the
+// frame was taken: the latest gate status per release in the scene
+function gateRecordAtTake() {
+  return S.jewelry.map((inst) => {
+    // the mesh hash is the unique link from a photo to its gate record
+    const latest = [...GATE.entries].reverse().find((e) => e.mesh_sha256 === inst.mesh_sha256);
+    return {
+      release: latest ? latest.release : inst.release_id,
+      version: inst.version,
+      mesh_sha256: inst.mesh_sha256,
+      verified: latest ? latest.verified : true // it is in the scene, so it passed the gate on entry
+    };
+  });
+}
+
 async function captureFrame() {
+  settleSlides(); // the take photographs the committed state, never a mid-slide frame
   const pinned = S.live.mode === "pinned" ? currentPinned() : null;
   const cameraState = pinned
-    ? { mode: "pinned", pinned: pinned.name, position: pinned.position, target: pinned.target, fov: pinned.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance }
-    : { mode: "orbit", position: [...S.live.position], target: [...S.live.target], fov: S.live.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance };
+    ? { mode: "pinned", name: pinned.name, position: [...pinned.position], target: [...pinned.target], fov: pinned.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance }
+    : { mode: "orbit", name: null, position: [...S.live.position], target: [...S.live.target], fov: S.live.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance };
   const snapshot = sceneCoreState();
   const state_hash = await sha256hex(snapshot);
   const png = await renderPng(1600);
   const thumb = await makeThumb(png);
   const id = "c" + Math.random().toString(36).slice(2, 9);
-  const name = `capture ${String(S.captures.length + 1).padStart(2, "0")}`;
-  S.captures.push({ id, name, camera: cameraState, created_utc: nowUtc(), state_hash, snapshot });
+  const set = activeSet();
+  const name = `capture ${String((set.photo_ids || []).length + 1).padStart(2, "0")}`;
+  const photo = { id, name, camera: cameraState, created_utc: nowUtc(), state_hash, snapshot, gate: gateRecordAtTake() };
+  S.photos.push(photo);
+  set.photo_ids.push(id);
   CAPTURE_IMG.set(id, png);
   CAPTURE_THUMBS.set(id, thumb);
   renderCaptureStrip(); saveState();
-  toast(`${name} saved. adjust the scene and capture another view.`);
+  toast(`${name} saved to "${set.name}". adjust the scene and capture another view.`);
+  return photo;
 }
 
-async function reproduceCapture(cap) {
-  if (!cap.snapshot) { toast("this capture predates full snapshots"); return; }
+async function reproduceCapture(photo) {
+  if (!photo.snapshot) { toast("this photo predates full snapshots"); return; }
   const prev = sceneCoreState();
-  await applyCoreState(cap.snapshot);
+  await applyCoreState(photo.snapshot);
   const png = await renderPng(1600);
-  CAPTURE_IMG.set(cap.id, png);
-  CAPTURE_THUMBS.set(cap.id, await makeThumb(png));
+  CAPTURE_IMG.set(photo.id, png);
+  CAPTURE_THUMBS.set(photo.id, await makeThumb(png));
   await applyCoreState(prev);
   renderCaptureStrip();
-  toast(`${cap.name} re-rendered from its saved scene state`);
+  toast(`${photo.name} re-rendered from its recorded scene state`);
 }
 
 async function applyCoreState(core) {
@@ -2468,63 +2692,122 @@ async function syncSceneToState() {
   updateVpOverlay();
 }
 
-function showCaptureModal(cap) {
+// batch reproduce: re-render the whole active set in order from snapshots,
+// leaving the working scene exactly as it was
+async function reproduceActiveSet() {
+  const set = activeSet();
+  const photos = photosInSet(set);
+  if (!photos.length) { toast(`"${set.name}" has no photos yet`); return; }
+  const prev = sceneCoreState();
+  for (const photo of photos) {
+    if (!photo.snapshot) continue;
+    await applyCoreState(photo.snapshot);
+    const png = await renderPng(1600);
+    CAPTURE_IMG.set(photo.id, png);
+    CAPTURE_THUMBS.set(photo.id, await makeThumb(png));
+  }
+  await applyCoreState(prev);
+  renderCaptureStrip();
+  toast(`re-rendered ${photos.length} photo${photos.length === 1 ? "" : "s"} in "${set.name}" from their recorded state`);
+}
+
+function showCaptureModal(photo) {
   const modal = $("#capmodal");
   const img = modal.querySelector("img");
-  img.src = CAPTURE_IMG.get(cap.id) || CAPTURE_THUMBS.get(cap.id) || "";
+  img.src = CAPTURE_IMG.get(photo.id) || CAPTURE_THUMBS.get(photo.id) || "";
+  const cam = photo.camera;
   modal.querySelector(".capmodal-meta").textContent =
-    `${cap.name} · ${cap.camera.mode} · state sha-256 ${cap.state_hash.slice(0, 16)}… · ${cap.created_utc}`;
+    `${photo.name} · ${cam.mode}${cam.name ? " · camera " + cam.name : ""} · state sha-256 ${photo.state_hash.slice(0, 16)}… · ${photo.created_utc}` +
+    (photo.gate && photo.gate.length ? ` · ${photo.gate.length} verified release${photo.gate.length === 1 ? "" : "s"}` : "");
   modal.style.display = "flex";
 }
 $("#capmodal").addEventListener("click", () => { $("#capmodal").style.display = "none"; });
 
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+function exportFilename(photo) {
+  return `${slug(activeSet().name)}-${slug(photo.name)}.png`;
+}
+
 function renderCaptureStrip() {
   const strip = $("#capstrip");
   strip.innerHTML = "";
-  $("#capcount").textContent = `${S.captures.length} capture${S.captures.length === 1 ? "" : "s"}`;
-  if (!S.captures.length) {
-    strip.appendChild(el("div", "empty", "no captures yet. compose the scene and save a frame, then adjust and capture again."));
-    return;
+  const set = activeSet();
+  const photos = photosInSet(set);
+  $("#capcount").textContent = `${set.name} · ${photos.length} photo${photos.length === 1 ? "" : "s"}`;
+
+  // capture sets: the recording of a shoot
+  const setRow = el("div", "btnrow");
+  for (const s of S.sets) {
+    const chip = el("button", "btn mini" + (s.id === S.active_set ? " primary" : ""), s.name);
+    chip.title = "make this the active set";
+    chip.addEventListener("click", () => { S.active_set = s.id; renderCaptureStrip(); saveState(); });
+    setRow.appendChild(chip);
   }
-  S.captures.forEach((cap, i) => {
+  const newSetInp = document.createElement("input"); newSetInp.type = "text"; newSetInp.placeholder = "set name"; newSetInp.style.width = "110px";
+  const newSetBtn = el("button", "btn mini", "new set");
+  newSetBtn.addEventListener("click", () => {
+    const name = newSetInp.value.trim() || "set " + (S.sets.length + 1);
+    const id = "set" + Date.now().toString(36);
+    S.sets.push({ id, name, photo_ids: [] });
+    S.active_set = id;
+    newSetInp.value = "";
+    renderCaptureStrip(); saveState();
+    toast(`capture set "${name}" created and active`);
+  });
+  setRow.append(newSetInp, newSetBtn);
+  const renameInp = document.createElement("input"); renameInp.type = "text"; renameInp.value = set.name; renameInp.style.width = "110px";
+  renameInp.title = "rename the active set";
+  renameInp.addEventListener("change", () => { set.name = renameInp.value.trim() || set.name; renderCaptureStrip(); saveState(); });
+  setRow.appendChild(renameInp);
+  strip.appendChild(setRow);
+
+  const stripRow = el("div", "capstrip-row");
+  if (!photos.length) {
+    stripRow.appendChild(el("div", "empty", "no photos in this set yet. compose the scene and save a frame, then adjust and capture again."));
+  }
+  photos.forEach((photo, i) => {
     const card = el("div", "capcard");
     const img = document.createElement("img");
-    img.src = CAPTURE_THUMBS.get(cap.id) || "";
-    img.alt = cap.name;
+    img.src = CAPTURE_THUMBS.get(photo.id) || "";
+    img.alt = photo.name;
     img.title = "open the full frame";
     img.style.cursor = "zoom-in";
-    img.addEventListener("click", () => showCaptureModal(cap));
+    img.addEventListener("click", () => showCaptureModal(photo));
     card.appendChild(img);
     const body = el("div", "cc-body");
     const nameInp = document.createElement("input");
-    nameInp.type = "text"; nameInp.className = "cc-name"; nameInp.value = cap.name;
-    nameInp.addEventListener("change", () => { cap.name = nameInp.value || cap.name; saveState(); });
+    nameInp.type = "text"; nameInp.className = "cc-name"; nameInp.value = photo.name;
+    nameInp.addEventListener("change", () => { photo.name = nameInp.value || photo.name; saveState(); });
     body.appendChild(nameInp);
-    body.appendChild(el("div", "cc-meta", `${cap.camera.mode} · ${cap.created_utc} · state ${cap.state_hash.slice(0, 8)}`));
+    body.appendChild(el("div", "cc-meta", `${photo.camera.mode}${photo.camera.name ? " · " + photo.camera.name : ""} · ${photo.created_utc} · state ${photo.state_hash.slice(0, 8)}`));
     const actions = el("div", "cc-actions");
     const mk = (label, fn, cls) => { const b = el("button", cls || "btn mini", label); b.addEventListener("click", fn); return b; };
     actions.append(
-      mk("reproduce", () => reproduceCapture(cap)),
-      mk("png", () => exportCapture(cap)),
+      mk("reproduce", () => reproduceCapture(photo)),
+      mk("png", () => exportCapture(photo)),
       mk("up", () => moveCapture(i, -1)),
       mk("down", () => moveCapture(i, 1)),
-      mk("x", () => deleteCapture(cap), "btn mini danger")
+      mk("x", () => deleteCapture(photo), "btn mini danger")
     );
     body.appendChild(actions);
     card.appendChild(body);
-    strip.appendChild(card);
+    stripRow.appendChild(card);
   });
+  strip.appendChild(stripRow);
 }
 function moveCapture(i, dir) {
+  const set = activeSet();
+  const ids = set.photo_ids;
   const j = i + dir;
-  if (j < 0 || j >= S.captures.length) return;
-  const arr = S.captures;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
+  if (j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
   renderCaptureStrip(); saveState();
 }
-function deleteCapture(cap) {
-  S.captures = S.captures.filter((c) => c !== cap);
-  CAPTURE_IMG.delete(cap.id); CAPTURE_THUMBS.delete(cap.id);
+function deleteCapture(photo) {
+  const set = activeSet();
+  set.photo_ids = set.photo_ids.filter((id) => id !== photo.id);
+  S.photos = S.photos.filter((p) => p !== photo);
+  CAPTURE_IMG.delete(photo.id); CAPTURE_THUMBS.delete(photo.id);
   renderCaptureStrip(); saveState();
 }
 function downloadLink(name, href) {
@@ -2532,20 +2815,21 @@ function downloadLink(name, href) {
   a.href = href; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
 }
-function exportCapture(cap) {
-  const img = CAPTURE_IMG.get(cap.id);
+function exportCapture(photo) {
+  const img = CAPTURE_IMG.get(photo.id);
   if (!img) { toast("full frame not in memory. use reproduce, then export."); return; }
-  downloadLink(`${cap.name.replace(/\s+/g, "-")}.png`, img);
+  downloadLink(exportFilename(photo), img);
 }
 async function exportCaptureSet() {
-  if (!S.captures.length) { toast("nothing to export yet"); return; }
-  for (let i = 0; i < S.captures.length; i++) {
-    exportCapture(S.captures[i]);
+  const set = activeSet();
+  const photos = photosInSet(set);
+  if (!photos.length) { toast(`"${set.name}" has no photos to export yet`); return; }
+  for (let i = 0; i < photos.length; i++) {
+    exportCapture(photos[i]);
     await new Promise((r) => setTimeout(r, 350));
   }
-  toast(`exported ${S.captures.length} png images`);
+  toast(`exported ${photos.length} png image${photos.length === 1 ? "" : "s"} from "${set.name}"`);
 }
-
 // ===== full state: export, import, reset, restore =====
 function exportSceneState() {
   const blob = new Blob([JSON.stringify(serializeState(true), null, 2)], { type: "application/json" });
@@ -2585,11 +2869,26 @@ async function applyFullState(raw, opts = {}) {
     const b = BACKDROPS[st.environment.backdrop] || BACKDROPS.warm_gray;
     st.environment = { ...b, preset: st.environment.backdrop };
   }
-  // captures: pull thumbs into memory, keep the rest as values
-  for (const c of st.captures || []) {
+  // photos: pull thumbs into memory, keep the rest as values
+  for (const c of st.photos || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }
     if (!c.snapshot) c.snapshot = null; // captures predating snapshots cannot reproduce
+    if (!c.gate) c.gate = [];           // photos predating the gate array carry none
   }
+  // v1 saves predate capture sets: their captures become the photos of one
+  // implicit set, exactly what the old strip showed
+  if (Array.isArray(st.captures)) {
+    if (st.captures.length && !(st.photos || []).length) {
+      st.photos = st.captures;
+      const id = "set" + (st.sets && st.sets.length ? st.sets.length + 1 : 1);
+      st.sets = [{ id, name: "shoot 1", photo_ids: st.captures.map((c) => c.id) }];
+      st.active_set = id;
+    }
+    delete st.captures;
+  }
+  st.state_version = 2;
+  if (!st.sets || !st.sets.length) { st.sets = [{ id: "set1", name: "shoot 1", photo_ids: [] }]; }
+  if (!st.sets.find((x) => x.id === st.active_set)) st.active_set = st.sets[0].id;
   S = st;
   await syncSceneToState();
   renderCaptureStrip();
@@ -2619,6 +2918,7 @@ $("#btn-reset-scene").addEventListener("click", () => {
 });
 $("#btn-export-state").addEventListener("click", exportSceneState);
 $("#btn-export-caps").addEventListener("click", exportCaptureSet);
+$("#btn-batch-repro").addEventListener("click", reproduceActiveSet);
 $("#btn-capture").addEventListener("click", captureFrame);
 
 // ===== boot =====
@@ -2660,6 +2960,7 @@ async function runSelfTest() {
   let mesh = null;
   g.traverse((o) => { if (o.isMesh) mesh = o; });
   if (mesh) mesh.material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+  settleSlides(); // probes measure the seated piece, not a mid-slide view
   renderFrame();
   camera.updateMatrixWorld();
   g.updateWorldMatrix(true, true);
@@ -2704,6 +3005,71 @@ async function runSelfTest() {
   let green = 0;
   for (let i = 0; i < dE.length; i += 4) if (dE[i] > 40 && dE[i] < 100 && dE[i + 1] > 80 && dE[i + 2] < 90) green++;
   results.push("manual backdrop green pixels: " + green);
+
+  // seat clamp: pressing a piece toward the hand into an occupied band seats
+  // it at contact clearance (neighbor offset + width + 0.25mm)
+  const clamped = applySeat(second, first.offset_mm);
+  const expectSeat = Math.round((first.offset_mm + pieceWidthMm(byRelease.get(first.release_id)) + 0.25) * 10) / 10;
+  results.push("seat clamp at contact: " + clamped.toFixed(1) + " (expected " + expectSeat.toFixed(1) + ")");
+  applySeat(second, 0); // restore the stack order for the rest of the run
+
+  // slide-on transitions are view-only: transition-on and transition-off
+  // adds end at identical state hashes. iids are random identifiers, not
+  // quantitative truth, so the comparison normalizes them away.
+  const normalizedState = () => JSON.parse(JSON.stringify(sceneCoreState(), (k, v) => (k === "iid" ? "j" : v)));
+  localStorage.setItem("studiogram_transitions", "off");
+  await addJewelryInstance(REGISTRY[2].release_id, "silver_925");
+  const third = S.jewelry[2];
+  const hashNoSlide = await sha256hex(normalizedState());
+  removeJewelryInstance(third.iid);
+  localStorage.setItem("studiogram_transitions", "on");
+  await addJewelryInstance(REGISTRY[2].release_id, "silver_925");
+  const hashSlide = await sha256hex(normalizedState());
+  removeJewelryInstance(S.jewelry[2].iid);
+  results.push("transition on/off hashes equal: " + (hashNoSlide === hashSlide));
+
+  // photos: a photo from a named camera keeps the take-time values. reframe
+  // the camera afterwards, reproduce, and the frame must not change.
+  // the magenta paint above was a view-only probe: rebuild the piece from
+  // state first, or the repro would rightly restore the real material.
+  await buildJewelryInstance(first);
+  S.cameras.push({ name: "selftest cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
+  S.live = { ...S.live, mode: "pinned", pinned: "selftest cam" };
+  syncModeBadge();
+  const photo = await captureFrame();
+  const photoBackToBack = await captureFrame();
+  results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
+  deleteCapture(photoBackToBack);
+  results.push("photo camera name: " + photo.camera.name + ", mode: " + photo.camera.mode);
+  results.push("photo gate record: " + JSON.stringify(photo.gate));
+  const takePng = CAPTURE_IMG.get(photo.id);
+  S.cameras.find((c) => c.name === "selftest cam").position = [300, 400, 500];
+  S.cameras.find((c) => c.name === "selftest cam").fov = 40;
+  await reproduceCapture(photo);
+  const reproPng = CAPTURE_IMG.get(photo.id);
+  results.push("photo survives camera reframe (values are truth): " + (takePng === reproPng));
+  if (takePng !== reproPng) {
+    const px = async (url) => { const i = await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.src = url; }); const c = document.createElement("canvas"); c.width = c.height = 400; const x = c.getContext("2d"); x.drawImage(i, 0, 0, 400, 400); return x.getImageData(0, 0, 400, 400).data; };
+    const a = await px(takePng), b = await px(reproPng);
+    let diff = 0;
+    for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) > 8 || Math.abs(a[i + 1] - b[i + 1]) > 8 || Math.abs(a[i + 2] - b[i + 2]) > 8) diff++;
+    results.push("photo take-vs-repro diff pixels: " + diff);
+  }
+
+  // capture sets: per-set numbering, and export filenames derive from set + photo
+  S.sets.push({ id: "set2", name: "detail study", photo_ids: [] });
+  S.active_set = "set2";
+  const photo2 = await captureFrame();
+  results.push("second set numbering restarts: " + photo2.name + " in " + activeSet().name);
+  results.push("export filename: " + exportFilename(photo2));
+  S.active_set = "set1";
+  S.cameras = S.cameras.filter((c) => c.name !== "selftest cam");
+  S.live = { ...S.live, mode: "orbit" };
+  controls.enabled = true; syncModeBadge();
+  deleteCapture(photo);
+  deleteCapture(photo2);
+  S.sets = S.sets.filter((x) => x.id !== "set2");
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -2721,6 +3087,8 @@ async function runSceneAudit() {
   results.push("live: " + JSON.stringify({ position: S.live.position, target: S.live.target, mode: S.live.mode }));
   results.push("pose preset: " + S.pose.preset + ", wrist: " + JSON.stringify(S.pose.wrist));
   results.push("environment: preset " + S.environment.preset + ", edge " + S.environment.bg + ", center " + S.environment.center);
+  results.push("capture sets: " + S.sets.map((x) => x.name + " (" + x.photo_ids.length + ")").join(", ") + " · active: " + activeSet().name);
+  results.push("finger radii mm: " + (HAND.fingerR.size ? [...HAND.fingerR].map(([f, r]) => f.slice(0, 3) + " " + r.toFixed(1)).join(" ") : "not sampled"));
   if (HAND.loaded) {
     HAND.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(HAND.model);

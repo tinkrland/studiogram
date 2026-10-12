@@ -137,7 +137,9 @@
   }
   #capleft { border-right: 1px solid var(--line); padding: 12px 14px; }
   #capleft h3 { margin: 0 0 8px; font-size: 10.5px; letter-spacing: 0.18em; color: var(--dim); font-weight: 600; }
-  #capstrip { display: flex; gap: 10px; overflow-x: auto; padding: 12px; align-items: stretch; }
+  #capstrip { display: flex; flex-wrap: wrap; gap: 10px; overflow-x: auto; padding: 12px; align-items: stretch; }
+  #capstrip > div { width: 100%; }
+  .capstrip-row { display: flex; gap: 10px; overflow-x: auto; align-items: stretch; }
   #capstrip::-webkit-scrollbar { height: 8px; }
   #capstrip::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
   .capcard {
@@ -212,6 +214,7 @@
       <div class="hint">captures are creator outputs for product presentation. the platform owns listing content, the studio owns the release, the scene owns the view.</div>
       <div class="btnrow">
         <button class="btn" id="btn-export-caps">export set as png</button>
+        <button class="btn" id="btn-batch-repro">reproduce set</button>
       </div>
       <div class="hint" id="capcount">0 captures</div>
     </div>

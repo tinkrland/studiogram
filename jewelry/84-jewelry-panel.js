@@ -4,7 +4,21 @@ function renderJewelryPanel() {
   PANEL.innerHTML = "";
   const reg = section(PANEL, "release registry");
   hint(reg, "releases enter scenes by reference: id, version, asset hash. this gate checks provenance and visual reliability only. it is never a castability, safety, or quality claim; product geometry validation belongs to the studio's release gate upstream.");
+  const prefRow = el("div", "row");
+  const tog = document.createElement("input"); tog.type = "checkbox"; tog.checked = slideOnEnabled();
+  tog.addEventListener("change", () => localStorage.setItem("studiogram_transitions", tog.checked ? "on" : "off"));
+  prefRow.append(el("label", null, "slide-on transitions"), tog);
+  reg.appendChild(prefRow);
+  // artist catalog grouping: cross-creator scenes are the norm, so each
+  // artist's catalog reads as its own section
+  const byArtist = new Map();
   for (const rec of REGISTRY) {
+    if (!byArtist.has(rec.creator_name)) byArtist.set(rec.creator_name, []);
+    byArtist.get(rec.creator_name).push(rec);
+  }
+  for (const [artist, recs] of byArtist) {
+    const cat = section(PANEL, artist + " — catalog");
+    for (const rec of recs) {
     const card = el("div", "card");
     const t = el("div", "t");
     t.appendChild(el("b", null, `${rec.name}`));
@@ -29,7 +43,8 @@ function renderJewelryPanel() {
     addBtn.addEventListener("click", () => addJewelryInstance(rec.release_id, metalSel.value));
     actions.append(metalSel, addBtn);
     card.appendChild(actions);
-    reg.appendChild(card);
+    cat.appendChild(card);
+    }
   }
 
   const inst = section(PANEL, "arrangement");
@@ -70,7 +85,15 @@ function renderJewelryPanel() {
       fRow.append(el("label", null, "at"), fingerSel);
       card.appendChild(fRow);
     }
-    slider(card, "seat offset", 0, 14, 0.1, () => j.offset_mm, (v) => { j.offset_mm = v; }, { apply: () => placeJewelryInstance(j), fmt: (v) => v.toFixed(1) });
+    // the seat range is the finger's derived fit band, not a fixed slider span
+    slider(card, "seat offset", 0, Math.max(seatBandMaxMm(j), 0.1), 0.1, () => j.offset_mm, (v) => { j._seat = v; }, { apply: () => { applySeat(j, j._seat === undefined ? j.offset_mm : j._seat); renderJewelryPanel(); }, fmt: (v) => v.toFixed(1) });
+    // fit is advisory, never a gate: the scene is a photograph, not a fitting
+    const fr = j.location.kind === "finger" && HAND.fingerR ? HAND.fingerR.get(j.location.finger) : null;
+    const ri = rec && rec.parameters.mesh_spec ? rec.parameters.mesh_spec.inner_radius_mm : null;
+    if (fr && ri) {
+      if (ri < fr - 1.2) card.appendChild(el("div", "hash", `advisory: wears tight on this finger (${ri.toFixed(1)}mm inner vs ${fr.toFixed(1)}mm finger)`));
+      else if (ri > fr + 1.8) card.appendChild(el("div", "hash", `advisory: sits loose, below the knuckle line (${ri.toFixed(1)}mm inner vs ${fr.toFixed(1)}mm finger)`));
+    }
     slider(card, "rotation", -180, 180, 1, () => j.rotation_deg, (v) => { j.rotation_deg = v; }, { apply: () => placeJewelryInstance(j), fmt: (v) => v.toFixed(0) });
     const metalSel = document.createElement("select");
     const rec2 = byRelease.get(j.release_id);

@@ -37,11 +37,26 @@ async function applyFullState(raw, opts = {}) {
     const b = BACKDROPS[st.environment.backdrop] || BACKDROPS.warm_gray;
     st.environment = { ...b, preset: st.environment.backdrop };
   }
-  // captures: pull thumbs into memory, keep the rest as values
-  for (const c of st.captures || []) {
+  // photos: pull thumbs into memory, keep the rest as values
+  for (const c of st.photos || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }
     if (!c.snapshot) c.snapshot = null; // captures predating snapshots cannot reproduce
+    if (!c.gate) c.gate = [];           // photos predating the gate array carry none
   }
+  // v1 saves predate capture sets: their captures become the photos of one
+  // implicit set, exactly what the old strip showed
+  if (Array.isArray(st.captures)) {
+    if (st.captures.length && !(st.photos || []).length) {
+      st.photos = st.captures;
+      const id = "set" + (st.sets && st.sets.length ? st.sets.length + 1 : 1);
+      st.sets = [{ id, name: "shoot 1", photo_ids: st.captures.map((c) => c.id) }];
+      st.active_set = id;
+    }
+    delete st.captures;
+  }
+  st.state_version = 2;
+  if (!st.sets || !st.sets.length) { st.sets = [{ id: "set1", name: "shoot 1", photo_ids: [] }]; }
+  if (!st.sets.find((x) => x.id === st.active_set)) st.active_set = st.sets[0].id;
   S = st;
   await syncSceneToState();
   renderCaptureStrip();
@@ -71,5 +86,6 @@ $("#btn-reset-scene").addEventListener("click", () => {
 });
 $("#btn-export-state").addEventListener("click", exportSceneState);
 $("#btn-export-caps").addEventListener("click", exportCaptureSet);
+$("#btn-batch-repro").addEventListener("click", reproduceActiveSet);
 $("#btn-capture").addEventListener("click", captureFrame);
 
