@@ -1,7 +1,7 @@
   backdropMesh = new THREE.Mesh(geo, mat);
   backdropMesh.position.set(0, 260, -620);
   scene.add(backdropMesh);
-  scene.background = new THREE.Color(BACKDROPS[S.environment.backdrop].bg);
+  scene.background = new THREE.Color(S.environment.bg);
 }
 
 // dof composite: scene -> hdr target with depth, then a fullscreen pass that

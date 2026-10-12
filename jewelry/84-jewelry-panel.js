@@ -83,6 +83,13 @@ function renderJewelryPanel() {
     const mRow = el("div", "row");
     mRow.append(el("label", null, "metal"), metalSel);
     card.appendChild(mRow);
+    const nav = el("div", "btnrow");
+    const up = el("button", "btn mini", "stack toward hand");
+    up.addEventListener("click", () => { reorderJewelry(j.iid, "hand"); renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); });
+    const down = el("button", "btn mini", "stack toward tip");
+    down.addEventListener("click", () => { reorderJewelry(j.iid, "tip"); renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); });
+    nav.append(up, down);
+    card.appendChild(nav);
     const rm = el("button", "btn mini danger", "remove from scene");
     rm.addEventListener("click", () => removeJewelryInstance(j.iid));
     card.appendChild(rm);

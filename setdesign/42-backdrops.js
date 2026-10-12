@@ -9,8 +9,10 @@
 
 // backdrop: plain seamless studio backdrop, center lifted
 let backdropMesh = null;
-function backdropTexture(name) {
-  const b = BACKDROPS[name];
+function backdropTexture() {
+  // renders the live environment values: a preset is a prefill on these same
+  // values, never a separate rendering path
+  const b = S.environment;
   const cv = document.createElement("canvas"); cv.width = 512; cv.height = 400;
   const ctx = cv.getContext("2d");
   ctx.fillStyle = b.bg; ctx.fillRect(0, 0, 512, 400);
@@ -23,4 +25,4 @@ function backdropTexture(name) {
 function applyEnvironment() {
   if (backdropMesh) { scene.remove(backdropMesh); backdropMesh.geometry.dispose(); backdropMesh.material.map.dispose(); backdropMesh.material.dispose(); }
   const geo = new THREE.PlaneGeometry(2400, 1700);
-  const mat = new THREE.MeshBasicMaterial({ map: backdropTexture(S.environment.backdrop) });
+  const mat = new THREE.MeshBasicMaterial({ map: backdropTexture() });

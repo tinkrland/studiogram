@@ -96,6 +96,15 @@ function defaultLights() {
     rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
   };
 }
+const BACKDROPS = {
+  paper: { bg: "#b8b5ad", center: "#f4f1ea" },
+  warm_gray: { bg: "#8f887c", center: "#cfc8bd" },
+  charcoal: { bg: "#1b1c20", center: "#3d4046" },
+  blush: { bg: "#c9a49c", center: "#eed4cd" },
+  sage: { bg: "#9aa793", center: "#d2dacb" },
+  midnight: { bg: "#0d0e15", center: "#23273a" }
+};
+
 function defaultState() {
   return {
     schema: "studiogram-scene-state", state_version: 1,
@@ -103,7 +112,7 @@ function defaultState() {
     pose: defaultPose(),
     jewelry: [],
     lighting: defaultLights(),
-    environment: { backdrop: "warm_gray" },
+    environment: { ...BACKDROPS.warm_gray, preset: "warm_gray" }, // bg/center are the values that render; a preset is a prefill, not a path
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },
     cameras: [],
     captures: [],
@@ -118,14 +127,6 @@ const METALS = {
   bronze_cu: { label: "bronze", color: 0xc98d5f, rough: 0.28 }
 };
 const AMBIENCE = { bright: 0.95, dim: 0.45, dark: 0.16 };
-const BACKDROPS = {
-  paper: { bg: "#b8b5ad", center: "#f4f1ea" },
-  warm_gray: { bg: "#8f887c", center: "#cfc8bd" },
-  charcoal: { bg: "#1b1c20", center: "#3d4046" },
-  blush: { bg: "#c9a49c", center: "#eed4cd" },
-  sage: { bg: "#9aa793", center: "#d2dacb" },
-  midnight: { bg: "#0d0e15", center: "#23273a" }
-};
 const LIGHT_RECIPES = {
   soft_studio: {
     label: "soft studio",

@@ -158,6 +158,25 @@ function updateJewelryMetal(inst) {
   j.material.color.set(METALS[inst.metal].color);
   j.material.roughness = METALS[inst.metal].rough;
 }
+// reorder within a stack: exchange seat offsets with the adjacent piece at the
+// same location. "hand" swaps toward the base (lower offset), "tip" toward the
+// fingertip. each piece stays its own object; only the two offsets exchange.
+function reorderJewelry(iid, dir) {
+  const inst = S.jewelry.find((x) => x.iid === iid);
+  if (!inst) return false;
+  const stack = S.jewelry
+    .filter((x) => x.location.kind === inst.location.kind && x.location.finger === inst.location.finger)
+    .sort((a, b) => a.offset_mm - b.offset_mm);
+  const i = stack.indexOf(inst);
+  const j = dir === "hand" ? i - 1 : i + 1;
+  if (j < 0 || j >= stack.length) return false;
+  const a = inst.offset_mm;
+  inst.offset_mm = stack[j].offset_mm;
+  stack[j].offset_mm = a;
+  placeJewelryInstance(inst); placeJewelryInstance(stack[j]);
+  saveState();
+  return true;
+}
 function removeJewelryInstance(iid) {
   removeJewelryMesh(iid);
   S.jewelry = S.jewelry.filter((x) => x.iid !== iid);

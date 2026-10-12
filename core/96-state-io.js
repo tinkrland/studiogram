@@ -31,6 +31,12 @@ async function applyFullState(raw, opts = {}) {
     }
   }
   st.jewelry = kept;
+  // environment: older saves carry only a preset name under 'backdrop'; the
+  // values it prefilled migrate forward so the scene still renders
+  if (st.environment && !st.environment.bg && st.environment.backdrop) {
+    const b = BACKDROPS[st.environment.backdrop] || BACKDROPS.warm_gray;
+    st.environment = { ...b, preset: st.environment.backdrop };
+  }
   // captures: pull thumbs into memory, keep the rest as values
   for (const c of st.captures || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }

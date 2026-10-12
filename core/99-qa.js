@@ -42,6 +42,30 @@ async function runSelfTest() {
   }
   results.push("magenta pixels in 400px render: " + magenta);
   results.push("skin pixels in 400px render: " + skin + " of " + total);
+
+  // stacking: a second piece at the same location auto-stacks, then a reorder
+  // must exchange the two seat offsets exactly
+  const first = S.jewelry[0];
+  await addJewelryInstance(REGISTRY[4].release_id, "gold_14k_yellow");
+  const second = S.jewelry[1];
+  results.push("auto-stack offsets: " + first.offset_mm.toFixed(1) + ", " + second.offset_mm.toFixed(1));
+  const swapped = reorderJewelry(second.iid, "hand");
+  results.push("reorder exchanged offsets: " + swapped + " -> " + first.offset_mm.toFixed(1) + ", " + second.offset_mm.toFixed(1));
+  const noMove = reorderJewelry(second.iid, "hand");
+  results.push("reorder at stack end refused: " + !noMove);
+
+  // manual environment: the editable values must drive the render, proving a
+  // preset is a prefill and not a separate rendering path
+  S.environment = { bg: "#3d6b4a", center: "#3d6b4a", preset: "manual green" };
+  applyEnvironment();
+  const pngEnv = await renderPng(400);
+  const imgE = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = pngEnv; });
+  const cvE = document.createElement("canvas"); cvE.width = cvE.height = 400;
+  const ctxE = cvE.getContext("2d"); ctxE.drawImage(imgE, 0, 0);
+  const dE = ctxE.getImageData(0, 0, 400, 400).data;
+  let green = 0;
+  for (let i = 0; i < dE.length; i += 4) if (dE[i] > 40 && dE[i] < 100 && dE[i + 1] > 80 && dE[i + 2] < 90) green++;
+  results.push("manual backdrop green pixels: " + green);
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -58,6 +82,7 @@ async function runSceneAudit() {
   results.push("camera pos: " + camera.position.toArray().map((n) => n.toFixed(1)).join(", ") + ", target: " + controls.target.toArray().map((n) => n.toFixed(1)).join(", "));
   results.push("live: " + JSON.stringify({ position: S.live.position, target: S.live.target, mode: S.live.mode }));
   results.push("pose preset: " + S.pose.preset + ", wrist: " + JSON.stringify(S.pose.wrist));
+  results.push("environment: preset " + S.environment.preset + ", edge " + S.environment.bg + ", center " + S.environment.center);
   if (HAND.loaded) {
     HAND.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(HAND.model);

@@ -720,6 +720,15 @@ function defaultLights() {
     rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
   };
 }
+const BACKDROPS = {
+  paper: { bg: "#b8b5ad", center: "#f4f1ea" },
+  warm_gray: { bg: "#8f887c", center: "#cfc8bd" },
+  charcoal: { bg: "#1b1c20", center: "#3d4046" },
+  blush: { bg: "#c9a49c", center: "#eed4cd" },
+  sage: { bg: "#9aa793", center: "#d2dacb" },
+  midnight: { bg: "#0d0e15", center: "#23273a" }
+};
+
 function defaultState() {
   return {
     schema: "studiogram-scene-state", state_version: 1,
@@ -727,7 +736,7 @@ function defaultState() {
     pose: defaultPose(),
     jewelry: [],
     lighting: defaultLights(),
-    environment: { backdrop: "warm_gray" },
+    environment: { ...BACKDROPS.warm_gray, preset: "warm_gray" }, // bg/center are the values that render; a preset is a prefill, not a path
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },
     cameras: [],
     captures: [],
@@ -742,14 +751,6 @@ const METALS = {
   bronze_cu: { label: "bronze", color: 0xc98d5f, rough: 0.28 }
 };
 const AMBIENCE = { bright: 0.95, dim: 0.45, dark: 0.16 };
-const BACKDROPS = {
-  paper: { bg: "#b8b5ad", center: "#f4f1ea" },
-  warm_gray: { bg: "#8f887c", center: "#cfc8bd" },
-  charcoal: { bg: "#1b1c20", center: "#3d4046" },
-  blush: { bg: "#c9a49c", center: "#eed4cd" },
-  sage: { bg: "#9aa793", center: "#d2dacb" },
-  midnight: { bg: "#0d0e15", center: "#23273a" }
-};
 const LIGHT_RECIPES = {
   soft_studio: {
     label: "soft studio",
@@ -911,8 +912,10 @@ function applyLighting() {
 
 // backdrop: plain seamless studio backdrop, center lifted
 let backdropMesh = null;
-function backdropTexture(name) {
-  const b = BACKDROPS[name];
+function backdropTexture() {
+  // renders the live environment values: a preset is a prefill on these same
+  // values, never a separate rendering path
+  const b = S.environment;
   const cv = document.createElement("canvas"); cv.width = 512; cv.height = 400;
   const ctx = cv.getContext("2d");
   ctx.fillStyle = b.bg; ctx.fillRect(0, 0, 512, 400);
@@ -925,11 +928,11 @@ function backdropTexture(name) {
 function applyEnvironment() {
   if (backdropMesh) { scene.remove(backdropMesh); backdropMesh.geometry.dispose(); backdropMesh.material.map.dispose(); backdropMesh.material.dispose(); }
   const geo = new THREE.PlaneGeometry(2400, 1700);
-  const mat = new THREE.MeshBasicMaterial({ map: backdropTexture(S.environment.backdrop) });
+  const mat = new THREE.MeshBasicMaterial({ map: backdropTexture() });
   backdropMesh = new THREE.Mesh(geo, mat);
   backdropMesh.position.set(0, 260, -620);
   scene.add(backdropMesh);
-  scene.background = new THREE.Color(BACKDROPS[S.environment.backdrop].bg);
+  scene.background = new THREE.Color(S.environment.bg);
 }
 
 // dof composite: scene -> hdr target with depth, then a fullscreen pass that
@@ -2062,6 +2065,25 @@ function updateJewelryMetal(inst) {
   j.material.color.set(METALS[inst.metal].color);
   j.material.roughness = METALS[inst.metal].rough;
 }
+// reorder within a stack: exchange seat offsets with the adjacent piece at the
+// same location. "hand" swaps toward the base (lower offset), "tip" toward the
+// fingertip. each piece stays its own object; only the two offsets exchange.
+function reorderJewelry(iid, dir) {
+  const inst = S.jewelry.find((x) => x.iid === iid);
+  if (!inst) return false;
+  const stack = S.jewelry
+    .filter((x) => x.location.kind === inst.location.kind && x.location.finger === inst.location.finger)
+    .sort((a, b) => a.offset_mm - b.offset_mm);
+  const i = stack.indexOf(inst);
+  const j = dir === "hand" ? i - 1 : i + 1;
+  if (j < 0 || j >= stack.length) return false;
+  const a = inst.offset_mm;
+  inst.offset_mm = stack[j].offset_mm;
+  stack[j].offset_mm = a;
+  placeJewelryInstance(inst); placeJewelryInstance(stack[j]);
+  saveState();
+  return true;
+}
 function removeJewelryInstance(iid) {
   removeJewelryMesh(iid);
   S.jewelry = S.jewelry.filter((x) => x.iid !== iid);
@@ -2398,6 +2420,13 @@ function renderJewelryPanel() {
     const mRow = el("div", "row");
     mRow.append(el("label", null, "metal"), metalSel);
     card.appendChild(mRow);
+    const nav = el("div", "btnrow");
+    const up = el("button", "btn mini", "stack toward hand");
+    up.addEventListener("click", () => { reorderJewelry(j.iid, "hand"); renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); });
+    const down = el("button", "btn mini", "stack toward tip");
+    down.addEventListener("click", () => { reorderJewelry(j.iid, "tip"); renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); });
+    nav.append(up, down);
+    card.appendChild(nav);
     const rm = el("button", "btn mini danger", "remove from scene");
     rm.addEventListener("click", () => removeJewelryInstance(j.iid));
     card.appendChild(rm);
@@ -2545,14 +2574,27 @@ function renderScenePanel() {
   hint(env, "plain backdrops for the first pass. the curated prop library is a later phase and is not part of this build.");
   const sw = el("div", "swatches");
   for (const [name, b] of Object.entries(BACKDROPS)) {
-    const btn = el("button", "swatch" + (S.environment.backdrop === name ? " on" : ""));
+    // a preset is on only while the live values equal it: editing the values
+    // by hand un-highlights the swatch, since the render follows the values
+    const on = S.environment.bg === b.bg && S.environment.center === b.center;
+    const btn = el("button", "swatch" + (on ? " on" : ""));
     btn.style.background = b.center;
     btn.title = name;
-    btn.addEventListener("click", () => { S.environment.backdrop = name; applyEnvironment(); renderScenePanel(); saveState(); });
+    btn.addEventListener("click", () => { S.environment = { ...b, preset: name }; applyEnvironment(); renderScenePanel(); saveState(); });
     sw.appendChild(btn);
   }
   env.appendChild(sw);
-  hint(env, "paper · warm gray · charcoal · blush · sage · midnight");
+  hint(env, "presets prefill the values below: paper · warm gray · charcoal · blush · sage · midnight. any value can then be adjusted by hand.");
+  const envRows = el("div");
+  for (const key of ["bg", "center"]) {
+    const row = el("div", "row");
+    const inp = document.createElement("input"); inp.type = "color";
+    inp.value = S.environment[key];
+    inp.addEventListener("input", () => { S.environment[key] = inp.value; applyEnvironment(); saveState(); });
+    row.append(el("label", null, key === "bg" ? "edge" : "center lift"), inp);
+    envRows.appendChild(row);
+  }
+  env.appendChild(envRows);
 
   const gate = section(PANEL, "provenance gate");
   hint(gate, "releases entered this scene by reference: id, version, asset hash. every entry below was re-hashed on arrival. the ingestion gate exists for visual reliability and provenance only, never as a castability, safety, or quality claim about a product.");
@@ -2794,6 +2836,12 @@ async function applyFullState(raw, opts = {}) {
     }
   }
   st.jewelry = kept;
+  // environment: older saves carry only a preset name under 'backdrop'; the
+  // values it prefilled migrate forward so the scene still renders
+  if (st.environment && !st.environment.bg && st.environment.backdrop) {
+    const b = BACKDROPS[st.environment.backdrop] || BACKDROPS.warm_gray;
+    st.environment = { ...b, preset: st.environment.backdrop };
+  }
   // captures: pull thumbs into memory, keep the rest as values
   for (const c of st.captures || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }
@@ -2889,6 +2937,30 @@ async function runSelfTest() {
   }
   results.push("magenta pixels in 400px render: " + magenta);
   results.push("skin pixels in 400px render: " + skin + " of " + total);
+
+  // stacking: a second piece at the same location auto-stacks, then a reorder
+  // must exchange the two seat offsets exactly
+  const first = S.jewelry[0];
+  await addJewelryInstance(REGISTRY[4].release_id, "gold_14k_yellow");
+  const second = S.jewelry[1];
+  results.push("auto-stack offsets: " + first.offset_mm.toFixed(1) + ", " + second.offset_mm.toFixed(1));
+  const swapped = reorderJewelry(second.iid, "hand");
+  results.push("reorder exchanged offsets: " + swapped + " -> " + first.offset_mm.toFixed(1) + ", " + second.offset_mm.toFixed(1));
+  const noMove = reorderJewelry(second.iid, "hand");
+  results.push("reorder at stack end refused: " + !noMove);
+
+  // manual environment: the editable values must drive the render, proving a
+  // preset is a prefill and not a separate rendering path
+  S.environment = { bg: "#3d6b4a", center: "#3d6b4a", preset: "manual green" };
+  applyEnvironment();
+  const pngEnv = await renderPng(400);
+  const imgE = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = pngEnv; });
+  const cvE = document.createElement("canvas"); cvE.width = cvE.height = 400;
+  const ctxE = cvE.getContext("2d"); ctxE.drawImage(imgE, 0, 0);
+  const dE = ctxE.getImageData(0, 0, 400, 400).data;
+  let green = 0;
+  for (let i = 0; i < dE.length; i += 4) if (dE[i] > 40 && dE[i] < 100 && dE[i + 1] > 80 && dE[i + 2] < 90) green++;
+  results.push("manual backdrop green pixels: " + green);
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -2905,6 +2977,7 @@ async function runSceneAudit() {
   results.push("camera pos: " + camera.position.toArray().map((n) => n.toFixed(1)).join(", ") + ", target: " + controls.target.toArray().map((n) => n.toFixed(1)).join(", "));
   results.push("live: " + JSON.stringify({ position: S.live.position, target: S.live.target, mode: S.live.mode }));
   results.push("pose preset: " + S.pose.preset + ", wrist: " + JSON.stringify(S.pose.wrist));
+  results.push("environment: preset " + S.environment.preset + ", edge " + S.environment.bg + ", center " + S.environment.center);
   if (HAND.loaded) {
     HAND.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(HAND.model);
