@@ -9,6 +9,8 @@ DennisH2010, blendswap.com/blends/view/66039, CC BY-SA 3.0 — see
 `assets/rigged-hand/blendswap-license.txt` and the in-app model
 credit; the license travels with every use).
 
+the working brief for the next pass lives in [instructions.md](instructions.md): current state, priorities (release mesh consumption, license review, vendoring three), the parked phases, and the house rules.
+
 ## what it does
 
 - **subject**: skinned hand mesh (8970 vertices, 33 bones) with per-joint

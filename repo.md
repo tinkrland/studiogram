@@ -2,6 +2,7 @@
 
 this file explains the repository itself. the [readme](README.md) explains
 the product.
+the [instructions](instructions.md) carry the working brief for the next pass.
 
 the repository map mirrors the product: one folder per feature domain.
 the single runtime program is split across those folders at its original
