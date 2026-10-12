@@ -1,15 +1,10 @@
 {
-  "name": "6accc4704ce18c32676cc89b",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "name": "studiogram",
+  "private": true,
+  "type": "module",
+  "description": "virtual product photography studio - deps are for the offline qa scripts only; the artifact itself has none",
   "dependencies": {
-    "three": "^0.160.0"
+    "puppeteer-core": "^24.0.0",
+    "pngjs": "^7.0.0"
   }
 }

@@ -72,6 +72,11 @@ assets/
 scripts/
   build-app.sh          the deterministic build (ordered manifest)
   split-parts.py        the parts -> domain splitter, verified reassembly
+  qa-drag.mjs           real mouse-drag qa in headless chrome (needs system
+                        chrome; npm i first). checks orbit drags move the
+                        view, pinned mode ignores pointer input and
+                        reproduces its framing exactly, and captures taken
+                        pinned record the pinned camera.
   export*.py, inspect_*, preview_hand.py, geotest*, normaltest*
                         the blender pipeline and offline qa
 
