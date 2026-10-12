@@ -17,6 +17,7 @@ async function runSelfTest() {
   results.push("bone names: " + [...HAND.bones.keys()].join(", "));
   results.push("ring bone found: " + !!HAND.bones.get("finger_ring01L") + ", bone len: " + (HAND.boneLen.get("ring") || 0).toFixed(4));
   const j = [...JEWELRY.values()][0];
+  results.push("ring mesh source: " + (j?.source || "none"));
   const g = j.group;
   let mesh = null;
   g.traverse((o) => { if (o.isMesh) mesh = o; });
@@ -91,6 +92,8 @@ async function runSceneAudit() {
   scene.traverse((o) => { if (o.isMesh) meshCount++; });
   for (const j of JEWELRY.values()) j.group.traverse((o) => { if (o.isMesh) ring = o; });
   results.push("meshes in scene: " + meshCount + ", ring mesh: " + !!ring + (ring ? ", ring parent type " + ring.parent.parent.type : ""));
+  results.push("jewelry: " + ([...JEWELRY.values()].map((j) =>
+    (j.rec?.name || "?") + " v" + (j.rec?.version ?? "?") + " (" + j.source + ")").join(" | ") || "none in scene"));
   const png = await renderPng(400);
   const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = png; });
   const cv = document.createElement("canvas"); cv.width = cv.height = 400;

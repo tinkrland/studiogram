@@ -26,6 +26,8 @@ function latheProfileDome(Ri, W, T, B) {
 }
 
 // deterministic mesh from the typed spec. same spec in, same geometry out.
+// the compiled-mesh path consumes the release's actual glb; this is the
+// fallback for records without a mesh asset, so a spec still renders.
 function buildArtifactMesh(rec, material) {
   const spec = rec.parameters.mesh_spec;
   const group = new THREE.Group();
@@ -74,7 +76,7 @@ async function addJewelryInstance(releaseId, metalKey) {
   await buildHand(); // the model must be loaded before anything can attach to a bone
   const rec = byRelease.get(releaseId);
   if (!rec) { toast("unknown release"); return; }
-  const gate = await gateRelease(releaseId, rec.version, rec.assets.mesh_sha256);
+  const gate = await gateRelease(releaseId, rec.version, rec.assets.mesh_sha256, rec.assets.mesh_glb_sha256);
   if (!gate.ok) { toast(`ingestion gate rejected ${rec.name}: ${gate.reason}`); return; }
   const locations = rec.parameters.placement.locations;
   const location = locations.includes("finger")
@@ -87,25 +89,42 @@ async function addJewelryInstance(releaseId, metalKey) {
   const inst = {
     iid, release_id: releaseId, version: rec.version,
     mesh_sha256: rec.assets.mesh_sha256,
+    mesh_glb_sha256: rec.assets.mesh_glb_sha256 || null,
     metal: metalKey && rec.metals_offered.includes(metalKey) ? metalKey : rec.metals_offered[0],
     location, offset_mm: Math.round(already * (w + 0.5) * 10) / 10, rotation_deg: 0
   };
   S.jewelry.push(inst);
-  buildJewelryInstance(inst);
+  await buildJewelryInstance(inst);
   renderJewelryPanel(); if (currentTab === "jewelry") renderPanel(currentTab); updateVpOverlay(); saveState();
   toast(`${rec.name} v${rec.version} added to scene by reference`);
 }
 
-function buildJewelryInstance(inst) {
+async function buildJewelryInstance(inst) {
   removeJewelryMesh(inst.iid);
   const rec = byRelease.get(inst.release_id);
   if (!rec) return;
   const material = metalMaterial(inst.metal);
   const g = new THREE.Group();
-  const group = buildArtifactMesh(rec, material);
-  group.traverse((o) => { if (o.isMesh) { o.material = material; o.castShadow = true; } });
-    g.add(group);
-  JEWELRY.set(inst.iid, { group: g, material, rec });
+  let group, source = "procedural fallback";
+  if (rec.assets.mesh_glb_uri) {
+    // the scene renders the release's compiled mesh: what is shown is what
+    // is manufactured. bytes are fetched through the same uri the gate
+    // hashed, so the render can only succeed on verified bytes.
+    const buf = await (await fetch(rec.assets.mesh_glb_uri)).arrayBuffer();
+    const gltf = await new GLTFLoader().parseAsync(buf, "");
+    group = gltf.scene;
+    source = "release glb " + rec.assets.mesh_glb_sha256.slice(0, 12);
+  } else {
+    group = buildArtifactMesh(rec, material);
+  }
+  group.traverse((o) => {
+    if (o.isMesh) {
+      o.material = material; o.castShadow = true;
+      if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+    }
+  });
+  g.add(group);
+  JEWELRY.set(inst.iid, { group: g, material, rec, source });
   placeJewelryInstance(inst);
 }
 function removeJewelryMesh(iid) {

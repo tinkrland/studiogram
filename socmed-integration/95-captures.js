@@ -75,7 +75,7 @@ async function syncSceneToState() {
   await buildHand();
   applyLighting();
   applyEnvironment();
-  for (const inst of S.jewelry) buildJewelryInstance(inst);
+  for (const inst of S.jewelry) await buildJewelryInstance(inst);
   camera.position.set(...S.live.position);
   controls.target.set(...S.live.target);
   controls.enabled = S.live.mode !== "pinned";

@@ -61,8 +61,14 @@ invariants, which this build must keep:
   presentation presets; surface layer (tone tint, follicle hair, nail
   polish from extracted nail plates, atlas-painted tattoos); porcelain or
   skin finish.
-- jewelry: procedural rings and bracelets attached to bones, stacking
-  offsets, cross-creator fixtures, metals with per-metal materials.
+- jewelry: release records now carry their compiled mesh (a glb embedded as
+  a data-uri plus a sha-256 over the glb bytes). the scene renders the
+  compiled mesh through GLTFLoader: what is shown is what is manufactured.
+  the ingestion gate recomputes the file hash the same way it recomputes the
+  spec hash, at registry verify and at every scene entry. the procedural
+  builder remains only as the fallback for records without a mesh asset.
+  pieces attach to bones with stacking offsets, cross-creator fixtures,
+  metals with per-metal materials.
 - camera: free orbit vs pinned deterministic shots, lens trio feeding a
   depth-of-field composite; pinned framing ignores pointer input and
   reproduces exactly (qa-verified).
@@ -75,7 +81,13 @@ invariants, which this build must keep:
 
 ## next-pass priorities, in order
 
-1. **release mesh consumption.** the gap: `buildArtifactMesh()` in
+1. ~~**release mesh consumption.**~~ done: fixture records carry the
+   compiled glb (data-uri) plus `mesh_glb_sha256` over the glb bytes; the
+   gate recomputes it; the scene renders the real mesh. sizing stayed out,
+   fixtures carry `inner_radius_mm`. the remaining step to wire when the
+   platform exists is the same flow against real release records instead
+   of fixtures. the original gap statement for reference:
+   `buildArtifactMesh()` in
    `jewelry/70-jewelry.js` rebuilds geometry procedurally from
    `parameters.mesh_spec` (band, dome_band, signet, cuff). the scope's
    invariant is that the scene consumes the release's compiled mesh, so
@@ -100,11 +112,11 @@ invariants, which this build must keep:
    invariant long-term). no code action until ruled; do not ship
    production imagery before it.
 
-3. **vendor three.** the importmap pins `three@0.160.0` on unpkg:
-   version-deterministic but an external runtime dependency. vendor the
-   module (and the two addons) into the artifact or serve them beside it,
-   so the deterministic artifact has no external dependency. keep the
-   pin; only change where it is served from.
+3. ~~**vendor three.**~~ done: the pinned module and its addons are
+   vendored under `assets/vendor/three@0.160.0/` (pristine upstream bytes,
+   sha-256s recorded in its PROVENANCE.md, one documented import rewrite
+   in GLTFLoader) and inlined into the artifact as data-uris. no external
+   runtime dependency remains.
 
 4. **earlobe placement.** the scope supports finger, wrist, and earlobe;
    the build supports finger and wrist. earlobe needs authored ear

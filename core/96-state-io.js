@@ -23,12 +23,11 @@ async function applyFullState(raw, opts = {}) {
   // gate every release reference on import: id, version, mesh hash must match the registry
   const kept = [];
   for (const inst of st.jewelry || []) {
-    const rec = byRelease.get(inst.release_id);
-    const ok = rec && rec.version === inst.version && rec.assets.mesh_sha256 === inst.mesh_sha256;
-    if (ok) kept.push(inst);
+    const gate = await gateRelease(inst.release_id, inst.version, inst.mesh_sha256, inst.mesh_glb_sha256);
+    if (gate.ok) kept.push(inst);
     else {
       GATE.entries.push({ utc: nowUtc(), release: inst.release_id, version: inst.version, mesh_sha256: inst.mesh_sha256 || "missing", verified: false });
-      toast("a release reference failed the ingestion gate and was refused");
+      toast(`a release reference failed the ingestion gate (${gate.reason}) and was refused`);
     }
   }
   st.jewelry = kept;

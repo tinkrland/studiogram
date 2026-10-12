@@ -30,6 +30,12 @@ async function sha256hex(value) {
   const digest = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+// hash over raw bytes (an asset file), not canonical json: a compiled mesh's
+// identity is its bytes, recomputed at ingestion, never trusted from a claim.
+async function sha256bytes(buf) {
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 const nowUtc = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
 // ===== the release registry (fixtures) =====

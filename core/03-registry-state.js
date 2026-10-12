@@ -12,7 +12,16 @@ async function verifyRegistry() {
     const meshHash = await sha256hex(rec.parameters.mesh_spec);
     const recordCopy = { ...rec }; delete recordCopy.record_hash; delete recordCopy.prev_hash;
     const recordHash = await sha256hex(recordCopy);
-    const meshOk = meshHash === rec.assets.mesh_sha256;
+    // the compiled mesh is fetched and its bytes hashed: the record's claim
+    // must survive the recompute, same rule as the spec hash
+    let meshFileOk = true;
+    if (rec.assets.mesh_glb_sha256) {
+      try {
+        const buf = await (await fetch(rec.assets.mesh_glb_uri)).arrayBuffer();
+        meshFileOk = await sha256bytes(buf) === rec.assets.mesh_glb_sha256;
+      } catch (e) { meshFileOk = false; }
+    }
+    const meshOk = meshHash === rec.assets.mesh_sha256 && meshFileOk;
     const recordOk = recordHash === rec.record_hash;
     const chainOk = rec.prev_hash === null ? prev === null : prev === rec.prev_hash;
     prev = rec.record_hash;
@@ -29,12 +38,23 @@ async function verifyRegistry() {
 
 // a release enters a scene by reference only: id, version, asset hash.
 // nothing flows back, and no scene value ever modifies the record.
-async function gateRelease(releaseId, version, declaredMeshHash) {
+async function gateRelease(releaseId, version, declaredMeshHash, declaredMeshFileHash) {
   const rec = byRelease.get(releaseId);
   if (!rec) return { ok: false, reason: "unknown release id" };
   if (rec.version !== version) return { ok: false, reason: "version mismatch" };
   const meshHash = await sha256hex(rec.parameters.mesh_spec);
-  const verified = meshHash === rec.assets.mesh_sha256 && meshHash === declaredMeshHash;
+  let verified = meshHash === rec.assets.mesh_sha256 && meshHash === declaredMeshHash;
+  let reason = verified ? null : "mesh hash mismatch";
+  // a record with a compiled mesh must render that mesh: fetch it, hash the
+  // bytes, and require the scene's reference to carry the same file hash.
+  if (verified && rec.assets.mesh_glb_sha256) {
+    try {
+      const buf = await (await fetch(rec.assets.mesh_glb_uri)).arrayBuffer();
+      const fileHash = await sha256bytes(buf);
+      if (fileHash !== rec.assets.mesh_glb_sha256) { verified = false; reason = "mesh file hash mismatch"; }
+      else if (declaredMeshFileHash !== fileHash) { verified = false; reason = "stale mesh file reference"; }
+    } catch (e) { verified = false; reason = "mesh file unavailable"; }
+  }
   const entry = { utc: nowUtc(), release: rec.name, version, mesh_sha256: meshHash, verified };
   GATE.entries.push(entry);
   if (verified) GATE.ok++; else GATE.bad++;
