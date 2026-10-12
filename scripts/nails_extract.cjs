@@ -3,7 +3,7 @@
 // for the runtime polish composite (same pattern as the hair follicles).
 const fs = require("fs");
 const { execSync } = require("child_process");
-const b = fs.readFileSync("build/hand.glb");
+const b = fs.readFileSync("app/hand.glb");
 const jlen = b.readUInt32LE(12);
 const J = JSON.parse(b.slice(20, 20 + jlen).toString());
 const binStart = 20 + jlen + 8;
@@ -25,7 +25,7 @@ const distal = { finger_index03L: "index", finger_middle03L: "middle", finger_ri
 // texture lookup: export texel brightness per (u,v) via a ppm dump done in python beforehand
 // (JPEG decode in pure node is heavy; brightness array comes from a python-written raw file)
 const S = 2048;
-const lum = new Float32Array(fs.readFileSync("build/tex_lum.bin"));
+const lum = new Float32Array(fs.readFileSync("app/tex-lum.bin"));
 const lumAt = (u, v) => {
   const x = Math.min(S-1, Math.max(0, Math.round(u*S)));
   const y = Math.min(S-1, Math.max(0, Math.round(v*S))); // glTF v: 0 = bottom of image
@@ -66,5 +66,5 @@ for (const [finger, verts] of Object.entries(out)) {
   console.log(finger, "verts", verts.length, "bright", bright.length, "clusters", clusters.length,
     "plate n", plate.n, "uv center", plate.u.toFixed(3), plate.v.toFixed(3), "emitted pts", pts.length);
 }
-fs.writeFileSync("build/nail-region.json", JSON.stringify(nails));
-console.log("wrote build/nail-region.json");
+fs.writeFileSync("app/nail-region.json", JSON.stringify(nails));
+console.log("wrote app/nail-region.json");

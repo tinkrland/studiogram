@@ -1,8 +1,8 @@
 import bpy, json, statistics
-bpy.ops.wm.open_mainfile(filepath="incoming_files/riggedhand/Hand_v.4_cycles.blend")
+bpy.ops.wm.open_mainfile(filepath="assets/rigged-hand/hand-v4-cycles.blend")
 hand = bpy.data.objects["Hand"]; mesh = hand.data
 arm = bpy.data.objects["Armature"]
-img = bpy.data.images.load("incoming_files/riggedhand/HAND_C.jpg")
+img = bpy.data.images.load("assets/rigged-hand/hand-c.jpg")
 W, H = img.size
 px = list(img.pixels)
 def brightness(u, v):

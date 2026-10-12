@@ -6,7 +6,7 @@ light, captures.
 
 the subject is a rigged hand with a real skeleton ('Rigged Hand' by
 DennisH2010, blendswap.com/blends/view/66039, CC BY-SA 3.0 — see
-`incoming_files/riggedhand/BLENDSWAP_LICENSE.txt` and the in-app model
+`assets/rigged-hand/blendswap-license.txt` and the in-app model
 credit; the license travels with every use).
 
 ## what it does
@@ -31,28 +31,30 @@ credit; the license travels with every use).
 
 ## layout
 
-- `build/parts/` — the app source, eight ordered parts (head, core, state,
-  scene, hand, jewelry, panels, boot).
-- `build/` — the deterministic build pipeline: `build.sh` concatenates the
-  parts and inlines the fixtures, poses, uv regions and the glb model;
-  `export*.py` / `morphs.py` / `poses.py` run inside blender 4.2 (not
-  included) against `incoming_files/riggedhand/Hand_v.4_cycles.blend`;
-  `nails_extract.cjs` derives nail-plate uv regions from the exported glb.
-- `studiogram/index.html` — the built artifact, self-contained, no network.
-- `build/app.mjs` — the same build as a node-checkable module.
-- `tools/` — fixture generator.
-- `functions/serveStudiogram.ts` — deno endpoint that serves the built
+- `app/` — the studio application: the eight ordered source `parts/`, the
+  registry fixtures, and the deterministic build inputs (hand model glb,
+  authored poses, exported uv regions, base textures).
+- `artifact/` — the deterministic build outputs: `index.html`, the
+  self-contained one-artifact studio, and its node-checkable `app.mjs` twin.
+- `assets/rigged-hand/` — the licensed model sources ('Rigged Hand' by
+  DennisH2010, CC BY-SA 3.0; license and credit kept attached).
+- `scripts/` — the pipeline: `build-app.sh` concatenates the parts and
+  inlines the fixtures, poses, uv regions and the glb; `export*.py`,
+  `morphs.py`, `poses.py` run inside blender 4.2 (not included) against
+  the source blend; `nails_extract.cjs` derives nail-plate uv regions from
+  the exported glb; `inspect_*` and the test scripts are the qa loop.
+- `functions/serve-studiogram.ts` — deno endpoint that serves the built
   artifact with the right content type.
 
 ## build
 
 ```
-./build/build.sh
+scripts/build-app.sh
 ```
 
-outputs `studiogram/index.html` and runs a node syntax check on
-`build/app.mjs`. regenerating the glb / poses / uv regions requires blender
-4.2 on the path and re-running the export scripts in `build/`.
+outputs `artifact/index.html` and runs a node syntax check on
+`artifact/app.mjs`. regenerating the glb / poses / uv regions requires
+blender 4.2 on the path and re-running the export scripts in `scripts/`.
 
 ## invariants
 

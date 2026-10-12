@@ -1,4 +1,4 @@
-import { createRequire } "node:module";
+import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const THREE = require("three");
 // replicate the profile builder from the app

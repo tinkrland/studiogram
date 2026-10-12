@@ -1,5 +1,5 @@
 import fs from "node:fs";
-const buf = fs.readFileSync("build/hand.glb");
+const buf = fs.readFileSync("app/hand.glb");
 const magic = buf.readUInt32LE(0), jsonLen = buf.readUInt32LE(12), jsonType = buf.readUInt32LE(16);
 console.log("magic ok:", magic === 0x46546c67, "json chunk bytes:", jsonLen);
 const json = JSON.parse(buf.slice(20, 20 + jsonLen).toString());

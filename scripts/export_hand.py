@@ -1,5 +1,5 @@
 import bpy, os, json
-src = "incoming_files/riggedhand/"
+src = "assets/rigged-hand/"
 
 # --- cleanup: delete everything except Armature and Hand ---
 keep = {"Armature", "Hand"}
@@ -28,10 +28,10 @@ out = nt.nodes.new("ShaderNodeOutputMaterial"); out.location = (400, 0)
 bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled"); bsdf.location = (100, 0)
 bsdf.inputs["Roughness"].default_value = 0.55
 tex = nt.nodes.new("ShaderNodeTexImage"); tex.location = (-300, 300)
-tex.image = bpy.data.images.load(src + "HAND_C.jpg")
+tex.image = bpy.data.images.load(src + "hand-c.jpg")
 tex.image.name = "hand_color"
 ntex = nt.nodes.new("ShaderNodeTexImage"); ntex.location = (-300, -250)
-ntex.image = bpy.data.images.load(src + "HAND_N .jpg")
+ntex.image = bpy.data.images.load(src + "hand-n.jpg")
 ntex.image.name = "hand_normal"
 ntex.image.colorspace_settings.name = "Non-Color"
 normal = nt.nodes.new("ShaderNodeNormalMap"); normal.location = (-100, 0)
@@ -74,7 +74,7 @@ arm.select_set(True)
 hand.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.export_scene.gltf(
-    filepath="build/hand.glb",
+    filepath="app/hand.glb",
     export_format="GLB",
     use_selection=True,
     export_apply=True,
@@ -87,4 +87,4 @@ bpy.ops.export_scene.gltf(
     export_image_format="AUTO",
     export_extras=False,
 )
-print("GLBSIZE", os.path.getsize("build/hand.glb"))
+print("GLBSIZE", os.path.getsize("app/hand.glb"))

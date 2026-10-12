@@ -175,7 +175,7 @@ const fixtures = base.map((r) => {
   return record;
 });
 
-writeFileSync(new URL("./fixtures.json", import.meta.url), JSON.stringify(fixtures, null, 2));
+writeFileSync(new URL("../app/fixtures.json", import.meta.url), JSON.stringify(fixtures, null, 2));
 for (const f of fixtures) {
   console.log(`${f.name}: mesh ${f.assets.mesh_sha256.slice(0, 12)} record ${f.record_hash.slice(0, 12)} prev ${(f.prev_hash || "genesis").slice(0, 12)}`);
 }

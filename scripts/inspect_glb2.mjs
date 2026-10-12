@@ -1,5 +1,5 @@
 import fs from "node:fs";
-const buf = fs.readFileSync("build/hand.glb");
+const buf = fs.readFileSync("app/hand.glb");
 const jsonLen = buf.readUInt32LE(12);
 const json = JSON.parse(buf.slice(20, 20 + jsonLen).toString());
 const nodeById = (id) => json.nodes[id];

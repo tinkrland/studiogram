@@ -1,7 +1,7 @@
 import bpy, json, math
 
 # open fresh copy of the cycles blend
-bpy.ops.wm.open_mainfile(filepath="incoming_files/riggedhand/Hand_v.4_cycles.blend")
+bpy.ops.wm.open_mainfile(filepath="assets/rigged-hand/hand-v4-cycles.blend")
 
 arm = bpy.data.objects["Armature"]
 hand = bpy.data.objects["Hand"]
@@ -24,7 +24,7 @@ for obj in (arm, hand):
     obj.location.x += delta[0]; obj.location.y += delta[1]; obj.location.z += delta[2]
 
 # materials
-src = "incoming_files/riggedhand/"
+src = "assets/rigged-hand/"
 mat = hand.data.materials[0]
 mat.name = "Skin"
 mat.use_nodes = True
@@ -34,9 +34,9 @@ out = nt.nodes.new("ShaderNodeOutputMaterial"); out.location = (400, 0)
 bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled"); bsdf.location = (100, 0)
 bsdf.inputs["Roughness"].default_value = 0.55
 tex = nt.nodes.new("ShaderNodeTexImage"); tex.location = (-300, 300)
-tex.image = bpy.data.images.load(src + "HAND_C.jpg"); tex.image.name = "hand_color"
+tex.image = bpy.data.images.load(src + "hand-c.jpg"); tex.image.name = "hand_color"
 ntex = nt.nodes.new("ShaderNodeTexImage"); ntex.location = (-300, -250)
-ntex.image = bpy.data.images.load(src + "HAND_N .jpg"); ntex.image.name = "hand_normal"
+ntex.image = bpy.data.images.load(src + "hand-n.jpg"); ntex.image.name = "hand_normal"
 ntex.image.colorspace_settings.name = "Non-Color"
 normal = nt.nodes.new("ShaderNodeNormalMap"); normal.location = (-100, 0)
 nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
@@ -181,10 +181,10 @@ for name, fn in POSES.items():
         if abs(r.x) > 1e-5 or abs(r.y) > 1e-5 or abs(r.z) > 1e-5:
             deltas[b.name] = [round(r.x, 4), round(r.y, 4), round(r.z, 4)]
     presets[name] = deltas
-    scene.render.filepath = f"build/pose_{name}.png"
+    scene.render.filepath = f"app/pose_{name}.png"
     bpy.ops.render.render(write_still=True)
     print("rendered", name, "bones touched:", len(deltas))
 
-with open("build/poses.json", "w") as f:
+with open("app/poses.json", "w") as f:
     json.dump(presets, f, indent=1)
 print("poses written:", list(presets.keys()))
