@@ -50,6 +50,7 @@ the artifact byte-for-byte) plus its authored inputs and scripts.
 - `core/` — shell, utils, state, registry fixtures, render composite,
   panels infra, state import/export, boot, the in-app qa hooks
 - `assets/` — the exported `hand.glb` and the licensed model sources
+- `spec/` — the working specs the next pass builds from
 - `scripts/` — generic pipeline (build, glb export, inspection, qa tests)
 - `artifact/` — the deterministic outputs: `index.html` and `app.mjs`
 

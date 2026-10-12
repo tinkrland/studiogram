@@ -12,6 +12,7 @@ in program order — the split parts reproduce the artifact byte-for-byte.
 ## repository map
 
 ```text
+spec/                 working specs the next pass builds from
 dollification/        the porcelain display-hand finish
   58-finish.js
 

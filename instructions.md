@@ -81,6 +81,11 @@ invariants, which this build must keep:
 
 ## next-pass priorities, in order
 
+status: mesh consumption (1) and vendoring three (3) are closed; manual
+backdrop values and stack reorder landed in the same spec pass. the open
+order is the license review (2), then the catalog slide-on and photo
+specs (4, 5), then earlobe (6, owner-gated).
+
 1. ~~**release mesh consumption.**~~ done: fixture records carry the
    compiled glb (data-uri) plus `mesh_glb_sha256` over the glb bytes; the
    gate recomputes it; the scene renders the real mesh. sizing stayed out,
@@ -118,7 +123,19 @@ invariants, which this build must keep:
    in GLTFLoader) and inlined into the artifact as data-uris. no external
    runtime dependency remains.
 
-4. **earlobe placement.** the scope supports finger, wrist, and earlobe;
+4. **catalog slide-on and seating.** specced in
+   [spec/catalog-to-scene.md](spec/catalog-to-scene.md): artist catalog
+   grouping, the physical slide-on transition (derived, stateless, not
+   the parked movement phase), sliding seat changes with collision
+   clamping, and the advisory fit rule (never a gate).
+
+5. **photo objects and capture sets.** specced in
+   [spec/photo-taking.md](spec/photo-taking.md): the photo as an
+   immutable record (camera values are truth, camera name is
+   provenance, gate entries recorded at take time), named ordered
+   capture sets as the recording of a shoot, batch reproduce.
+
+6. **earlobe placement.** the scope supports finger, wrist, and earlobe;
    the build supports finger and wrist. earlobe needs authored ear
    geometry (in-focus product-adjacent anatomy is authored geometry,
    never reconstructed output). parked until the owner rules on a second
