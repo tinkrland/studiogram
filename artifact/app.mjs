@@ -2589,15 +2589,20 @@ async function runSceneAudit() {
   if (HAND.loaded) {
     HAND.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(HAND.model);
+    // the camera the renderer actually uses: the orbit camera in free mode,
+    // the pinned helper for a shot. projections below must go through it.
+    const ac = activeCamera(); ac.updateMatrixWorld(true);
     results.push("morph targets: " + (HAND.skinned && HAND.skinned.morphTargetDictionary ? Object.keys(HAND.skinned.morphTargetDictionary).join(", ") : "none"));
   results.push("morph active: " + S.hand.presentation + " · build " + S.hand.morph.build + " · ft " + S.hand.morph.finger_thickness + " · nails " + S.hand.morph.nail_length + "/" + S.hand.morph.nail_shape);
   results.push("surface: finish " + S.hand.finish + " · tone " + S.hand.skin.tone + " · hair " + S.hand.skin.hair);
   results.push("nails: " + (S.hand.nails?.style || "natural") + (S.hand.nails?.style === "polished" ? " " + (S.hand.nails.color || "#b23a48") : ""));
   {
     // center-ray probe: the exact ray a screen-center click casts, against
-    // the posed skinned hand. ground truth for placement raycasts.
+    // the posed skinned hand. ground truth for placement raycasts. probed
+    // through the active camera so a pinned shot audits what it renders.
+    results.push("active camera: " + (S.live.mode === "pinned" ? "pinned " + S.live.pinned : "orbit") + " · fov " + ac.fov.toFixed(0));
     const rc = new THREE.Raycaster();
-    rc.setFromCamera(new THREE.Vector2(0, 0), camera);
+    rc.setFromCamera(new THREE.Vector2(0, 0), ac);
     const hit = rc.intersectObject(HAND.skinned, false)[0];
     results.push("center ray: " + (hit
       ? "hit uv " + hit.uv.x.toFixed(3) + "," + hit.uv.y.toFixed(3) + " dist " + Math.round(hit.distance)
@@ -2608,7 +2613,7 @@ async function runSceneAudit() {
   results.push("hand bbox world: " + (box.isEmpty() ? "EMPTY" : "min " + box.min.toArray().map((n) => n.toFixed(0)).join(",") + " max " + box.max.toArray().map((n) => n.toFixed(0)).join(",")));
     const p = HAND.skinned.geometry.attributes.position;
     results.push("skinned verts: " + p.count + ", visible: " + HAND.skinned.visible + ", culling: " + HAND.skinned.frustumCulled);
-    const ndc = box.getCenter(new THREE.Vector3()).project(camera);
+    const ndc = box.getCenter(new THREE.Vector3()).project(ac);
     results.push("hand center ndc: " + ndc.toArray().map((n) => n.toFixed(2)).join(", "));
   } else results.push("hand NOT loaded");
   let meshCount = 0, ring = null;
