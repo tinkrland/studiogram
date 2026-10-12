@@ -144,14 +144,20 @@ the open order is the license review (2), then earlobe (6, owner-gated).
    never reconstructed output). parked until the owner rules on a second
    subject; do not improvise one.
 
+7. **orbit video recording.** the movement decision was ruled by the owner
+   (2026-10-12): record the live moving viewport the rooms.xyz way, zoom
+   included, with mp4, mov, and webm export. specced in
+   [spec/orbit-video.md](spec/orbit-video.md): the path is the record
+   (per-frame camera values plus snapshot, quantitative only), the live
+   take is ephemeral and never enters scene state, and all three exports
+   re-render deterministically from the record. ready to build.
+
 ## deliberately parked: do not pull into this pass
 
 - props. the background prop library with meta sam reconstruction is a
   far-later phase and platform-prepopulated, never creator-generated.
   scenes here keep plain seamless backdrops; scene state carries no prop
   slots.
-- movement (movement previews, short animations, gifs). open owner
-  decision, not first-pass scope.
 - wearables (vr/ar try-on). future version, not scheduled.
 - anything platform-side: listings, pricing, orders, checkout. captures
   may someday be attached to listing content, but this repo never touches
