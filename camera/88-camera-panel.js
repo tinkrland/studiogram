@@ -46,6 +46,7 @@ function renderCameraPanel() {
     item.appendChild(el("span", "name", c.name));
     const go = el("button", "btn mini", "go");
     go.addEventListener("click", () => {
+      if (REC) { toast("pinning is deferred until the recording ends"); return; }
       S.live.mode = "pinned"; S.live.pinned = c.name; controls.enabled = false;
       syncModeBadge(); renderCameraPanel(); saveState();
     });

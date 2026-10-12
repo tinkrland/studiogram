@@ -144,13 +144,16 @@ the open order is the license review (2), then earlobe (6, owner-gated).
    never reconstructed output). parked until the owner rules on a second
    subject; do not improvise one.
 
-7. **orbit video recording.** the movement decision was ruled by the owner
-   (2026-10-12): record the live moving viewport the rooms.xyz way, zoom
-   included, with mp4, mov, and webm export. specced in
-   [spec/orbit-video.md](spec/orbit-video.md): the path is the record
-   (per-frame camera values plus snapshot, quantitative only), the live
-   take is ephemeral and never enters scene state, and all three exports
-   re-render deterministically from the record. ready to build.
+7. **video recording.** the movement decision was ruled by the owner
+   (2026-10-12, refined after seeing rooms.xyz in use): record the
+   manually driven viewport, zoom and pan included, with mp4, mov, and
+   webm export. built per [spec/video-recording.md](spec/video-recording.md):
+   the path is the record (per-frame camera values plus lighting deltas
+   plus snapshot, quantitative only), dimensions are chosen up front
+   (viewport, 1:1, 4:5, 9:16, 16:9), the live take is ephemeral and never
+   enters scene state, and all three exports re-render deterministically
+   through webcodecs (mediabunny 1.61.3 vendored, mpl-2.0). selftest and
+   real-input qa are green. closed.
 
 ## deliberately parked: do not pull into this pass
 

@@ -1,12 +1,3 @@
-    l.visible = st.on;
-    if (!st.on) continue;
-    l.color.set(st.color);
-    l.intensity = st.intensity;
-    l.position.copy(azToPos(st.azimuth, st.elevation, 620));
-  }
-  hemi.intensity = AMBIENCE[L.ambience];
-}
-
 // backdrop: plain seamless studio backdrop, center lifted
 let backdropMesh = null;
 function backdropTexture() {

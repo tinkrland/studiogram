@@ -88,14 +88,6 @@ function defaultPose() {
     wrist: { pitch: 0, yaw: 0, roll: 0 }
   };
 }
-function defaultLights() {
-  return {
-    recipe: "soft_studio", ambience: "bright",
-    key: { on: true, color: "#fff4e6", intensity: 3.0, azimuth: 40, elevation: 55 },
-    fill: { on: true, color: "#d6e8ff", intensity: 1.1, azimuth: -55, elevation: 20 },
-    rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
-  };
-}
 const BACKDROPS = {
   paper: { bg: "#b8b5ad", center: "#f4f1ea" },
   warm_gray: { bg: "#8f887c", center: "#cfc8bd" },
@@ -116,6 +108,7 @@ function defaultState() {
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },
     cameras: [],
     photos: [],          // the photo collection: immutable records of taken frames
+    recordings: [],      // orbit video records: per-frame camera path plus snapshot
     sets: [{ id: "set1", name: "shoot 1", photo_ids: [] }],
     active_set: "set1",
   };
@@ -127,37 +120,6 @@ const METALS = {
   gold_14k_yellow: { label: "gold 14k", color: 0xe9b95c, rough: 0.17 },
   gold_14k_rose: { label: "rose gold 14k", color: 0xe2a88c, rough: 0.17 },
   bronze_cu: { label: "bronze", color: 0xc98d5f, rough: 0.28 }
-};
-const AMBIENCE = { bright: 0.95, dim: 0.45, dark: 0.16 };
-const LIGHT_RECIPES = {
-  soft_studio: {
-    label: "soft studio",
-    ambience: "bright",
-    key: { on: true, color: "#fff4e6", intensity: 3.0, azimuth: 40, elevation: 55 },
-    fill: { on: true, color: "#d6e8ff", intensity: 1.1, azimuth: -55, elevation: 20 },
-    rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
-  },
-  bright_commercial: {
-    label: "bright commercial",
-    ambience: "bright",
-    key: { on: true, color: "#ffffff", intensity: 4.6, azimuth: 25, elevation: 60 },
-    fill: { on: true, color: "#eef4ff", intensity: 2.0, azimuth: -45, elevation: 30 },
-    rim: { on: true, color: "#ffffff", intensity: 1.2, azimuth: 170, elevation: 50 }
-  },
-  dramatic_rim: {
-    label: "dramatic rim",
-    ambience: "dark",
-    key: { on: true, color: "#ffe9d2", intensity: 1.3, azimuth: 55, elevation: 35 },
-    fill: { on: true, color: "#aac4e8", intensity: 0.25, azimuth: -60, elevation: 15 },
-    rim: { on: true, color: "#ffffff", intensity: 4.4, azimuth: 160, elevation: 30 }
-  },
-  warm_gold: {
-    label: "warm gold",
-    ambience: "dim",
-    key: { on: true, color: "#ffd9a0", intensity: 3.3, azimuth: 35, elevation: 50 },
-    fill: { on: true, color: "#ffe9d0", intensity: 0.8, azimuth: -50, elevation: 25 },
-    rim: { on: true, color: "#fff3e0", intensity: 2.4, azimuth: 150, elevation: 55 }
-  }
 };
 function saveState() {
   clearTimeout(saveState._t);

@@ -20,6 +20,7 @@ manifest = [
     "camera/88-camera-panel.js", "lighting/90-light-panel.js",
     "setdesign/92-scene-panel.js", "core/93-panel-shell.js",
     "socmed-integration/95-captures.js",
+    "socmed-integration/97-video.js",
     "core/96-state-io.js", "core/98-boot.js", "core/99-qa.js",
 ]
 js = "".join((root / p).read_text() for p in manifest)
@@ -48,6 +49,7 @@ def b64(path):
     return base64.b64encode(pathlib.Path(path).read_bytes()).decode()
 import base64 as _b64
 mods = {
+    "__MEDIABUNNY_B64__": b64(pathlib.Path("assets/vendor/mediabunny@1.61.3/mediabunny.mjs")),
     "__THREE_B64__": b64(vendor / "three.module.js"),
     "__ORBITCONTROLS_B64__": b64(vendor / "OrbitControls.js"),
     "__ROOMENVIRONMENT_B64__": b64(vendor / "RoomEnvironment.js"),

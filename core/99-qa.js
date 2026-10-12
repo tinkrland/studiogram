@@ -132,6 +132,80 @@ async function runSelfTest() {
   deleteCapture(photo2);
   S.sets = S.sets.filter((x) => x.id !== "set2");
 
+  // orbit video recording: refused while pinned, the path is the record,
+  // and export re-renders deterministically into all three containers
+  S.cameras.push({ name: "selftest vid cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
+  S.live = { ...S.live, mode: "pinned", pinned: "selftest vid cam" };
+  syncModeBadge();
+  const refused = startRecording();
+  results.push("recording refused while pinned: " + (refused === false));
+  results.push("no record created on refusal: " + (S.recordings.length === 0));
+  S.cameras = S.cameras.filter((c) => c.name !== "selftest vid cam");
+  S.live = { ...S.live, mode: "orbit" };
+  controls.enabled = true; syncModeBadge();
+  camera.position.set(140, 260, 460);
+  controls.target.set(-15, 100, 40);
+  $("#rec-size").value = "square"; // the recording's chosen dimensions
+  await new Promise((r) => setTimeout(r, 80));
+  startRecording();
+  results.push("record started: " + !!REC);
+  const capBlocked = await captureFrame();
+  results.push("photo capture blocked during take: " + (capBlocked === null));
+  // a scripted move: the camera sweeps in while the take runs, as zoom would
+  for (let i = 1; i <= 5; i++) {
+    camera.position.set(140 + i * 6, 260 + i * 3, 460 - i * 24);
+    await new Promise((r) => setTimeout(r, 50));
+    if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
+  }
+  await new Promise((r) => setTimeout(r, 60));
+  const vid = stopRecording();
+  results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
+  const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
+  results.push("path moved across the take: " + moved);
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
+  results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
+  results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  results.push("record serialized in state: " + (serializeState(false).recordings.length === 1));
+  const bufEq = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every((v, i) => v === new Uint8Array(b)[i]);
+  const brand = (b) => new TextDecoder().decode(new Uint8Array(b.slice(4, 10)));
+  if (typeof window.VideoEncoder !== "undefined") {
+    const w1 = await renderVideoBuffer(vid, "webm");
+    const w2 = await renderVideoBuffer(vid, "webm");
+    results.push("webm exports byte-identical: " + (w1.buffer && w2.buffer && bufEq(w1.buffer, w2.buffer)));
+    const mp4 = await renderVideoBuffer(vid, "mp4");
+    const mov = await renderVideoBuffer(vid, "mov");
+    results.push("mp4 brand " + brand(mp4.buffer) + ", mov brand " + brand(mov.buffer));
+    results.push("mp4/mov are sibling containers not copies: " + (mp4.buffer && mov.buffer && !bufEq(mp4.buffer, mov.buffer)));
+    // demux what was written: the container must carry the whole path
+    const { Input, BlobSource, MP4, WEBM } = await import("mediabunny");
+    const trackOf = async (buf, type, formats) => {
+      const input = new Input({ formats, source: new BlobSource(new Blob([buf], { type })) });
+      const track = await input.getPrimaryVideoTrack();
+      const stats = await track.computePacketStats();
+      const codec = track.codec;
+      input.dispose();
+      return { codec, count: stats.packetCount };
+    };
+    const demuxMp4 = await trackOf(mp4.buffer, mp4.mime, [MP4]);
+    const demuxWebm = await trackOf(w1.buffer, w1.mime, [WEBM]);
+    results.push("mp4 demuxes: " + demuxMp4.codec + ", " + demuxMp4.count + " packets");
+    results.push("webm demuxes: " + demuxWebm.codec + ", " + demuxWebm.count + " packets");
+    results.push("demuxed frames match the path: " + (demuxMp4.count === vid.path.length && demuxWebm.count === vid.path.length));
+  } else {
+    results.push("webcodecs unavailable: export falls back to the live take only");
+  }
+  deleteRecording(vid);
+  // import stays tolerant of saves that predate recordings
+  const rawVid = JSON.parse(JSON.stringify(serializeState(false)));
+  rawVid.recordings = [{ id: "vx", name: "imported", created_utc: nowUtc(), duration_ms: 900, fps: 30, width: 2, height: 2, state_hash: "", snapshot: null, gate: [], path: [{ position: [1, 1, 1], target: [0, 0, 0], fov: 26 }] }];
+  await applyFullState(rawVid);
+  results.push("recording imported from state: " + (S.recordings.length === 1 && S.recordings[0].path.length === 1));
+  const rawNoVid = JSON.parse(JSON.stringify(serializeState(false)));
+  delete rawNoVid.recordings;
+  await applyFullState(rawNoVid);
+  results.push("import tolerates missing recordings: " + (Array.isArray(S.recordings) && S.recordings.length === 0));
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -200,6 +274,80 @@ async function runSceneAudit() {
     else other++;
   }
   results.push("pixels: backdropish " + backdropish + ", dark " + dark + ", other " + other);
+  // orbit video recording: refused while pinned, the path is the record,
+  // and export re-renders deterministically into all three containers
+  S.cameras.push({ name: "selftest vid cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
+  S.live = { ...S.live, mode: "pinned", pinned: "selftest vid cam" };
+  syncModeBadge();
+  const refused = startRecording();
+  results.push("recording refused while pinned: " + (refused === false));
+  results.push("no record created on refusal: " + (S.recordings.length === 0));
+  S.cameras = S.cameras.filter((c) => c.name !== "selftest vid cam");
+  S.live = { ...S.live, mode: "orbit" };
+  controls.enabled = true; syncModeBadge();
+  camera.position.set(140, 260, 460);
+  controls.target.set(-15, 100, 40);
+  $("#rec-size").value = "square"; // the recording's chosen dimensions
+  await new Promise((r) => setTimeout(r, 80));
+  startRecording();
+  results.push("record started: " + !!REC);
+  const capBlocked = await captureFrame();
+  results.push("photo capture blocked during take: " + (capBlocked === null));
+  // a scripted move: the camera sweeps in while the take runs, as zoom would
+  for (let i = 1; i <= 5; i++) {
+    camera.position.set(140 + i * 6, 260 + i * 3, 460 - i * 24);
+    await new Promise((r) => setTimeout(r, 50));
+    if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
+  }
+  await new Promise((r) => setTimeout(r, 60));
+  const vid = stopRecording();
+  results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
+  const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
+  results.push("path moved across the take: " + moved);
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
+  results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
+  results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  results.push("record serialized in state: " + (serializeState(false).recordings.length === 1));
+  const bufEq = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every((v, i) => v === new Uint8Array(b)[i]);
+  const brand = (b) => new TextDecoder().decode(new Uint8Array(b.slice(4, 10)));
+  if (typeof window.VideoEncoder !== "undefined") {
+    const w1 = await renderVideoBuffer(vid, "webm");
+    const w2 = await renderVideoBuffer(vid, "webm");
+    results.push("webm exports byte-identical: " + (w1.buffer && w2.buffer && bufEq(w1.buffer, w2.buffer)));
+    const mp4 = await renderVideoBuffer(vid, "mp4");
+    const mov = await renderVideoBuffer(vid, "mov");
+    results.push("mp4 brand " + brand(mp4.buffer) + ", mov brand " + brand(mov.buffer));
+    results.push("mp4/mov are sibling containers not copies: " + (mp4.buffer && mov.buffer && !bufEq(mp4.buffer, mov.buffer)));
+    // demux what was written: the container must carry the whole path
+    const { Input, BlobSource, MP4, WEBM } = await import("mediabunny");
+    const trackOf = async (buf, type, formats) => {
+      const input = new Input({ formats, source: new BlobSource(new Blob([buf], { type })) });
+      const track = await input.getPrimaryVideoTrack();
+      const stats = await track.computePacketStats();
+      const codec = track.codec;
+      input.dispose();
+      return { codec, count: stats.packetCount };
+    };
+    const demuxMp4 = await trackOf(mp4.buffer, mp4.mime, [MP4]);
+    const demuxWebm = await trackOf(w1.buffer, w1.mime, [WEBM]);
+    results.push("mp4 demuxes: " + demuxMp4.codec + ", " + demuxMp4.count + " packets");
+    results.push("webm demuxes: " + demuxWebm.codec + ", " + demuxWebm.count + " packets");
+    results.push("demuxed frames match the path: " + (demuxMp4.count === vid.path.length && demuxWebm.count === vid.path.length));
+  } else {
+    results.push("webcodecs unavailable: export falls back to the live take only");
+  }
+  deleteRecording(vid);
+  // import stays tolerant of saves that predate recordings
+  const rawVid = JSON.parse(JSON.stringify(serializeState(false)));
+  rawVid.recordings = [{ id: "vx", name: "imported", created_utc: nowUtc(), duration_ms: 900, fps: 30, width: 2, height: 2, state_hash: "", snapshot: null, gate: [], path: [{ position: [1, 1, 1], target: [0, 0, 0], fov: 26 }] }];
+  await applyFullState(rawVid);
+  results.push("recording imported from state: " + (S.recordings.length === 1 && S.recordings[0].path.length === 1));
+  const rawNoVid = JSON.parse(JSON.stringify(serializeState(false)));
+  delete rawNoVid.recordings;
+  await applyFullState(rawNoVid);
+  results.push("import tolerates missing recordings: " + (Array.isArray(S.recordings) && S.recordings.length === 0));
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -211,7 +359,7 @@ async function runSceneAudit() {
   resize();
   if (location.hash.includes("selftest")) {
     await runSelfTest();
-    function animate() { requestAnimationFrame(animate); if (S.live.mode === "orbit") controls.update(); renderFrame(); }
+    function animate() { requestAnimationFrame(animate); if (VIEW_LOCKED) return; if (S.live.mode === "orbit") controls.update(); renderFrame(); }
     animate();
     return;
   }
@@ -238,6 +386,7 @@ async function runSceneAudit() {
 
   function animate() {
     requestAnimationFrame(animate);
+    if (VIEW_LOCKED) return; // video export/replay owns the canvas while locked
     if (S.live.mode === "orbit") controls.update();
     renderFrame();
   }

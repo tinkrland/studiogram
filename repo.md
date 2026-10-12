@@ -42,8 +42,8 @@ camera/               framing
   45-camera-modes.js    free orbit vs pinned deterministic shots
   88-camera-panel.js    the camera tab, lens trio, pinned cameras
 
-lighting/             the studio light rig
-  41-lighting.js        three named lights + ambience
+lighting/             the studio light rig, whole domain in one folder
+  41-lighting.js        three named lights, ambience, recipes, defaults, applyLighting
   90-light-panel.js     the light tab
 
 setdesign/            scene composition

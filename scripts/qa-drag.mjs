@@ -138,6 +138,48 @@ const liveAfter = await page.evaluate(() => {
 check("catalog add kept the camera pinned", liveAfter.mode === "pinned", "mode still pinned");
 check("catalog add did not move the camera", liveAfter.pos === camBefore, `camera ${camBefore} -> ${liveAfter.pos}`);
 
+// 9. recording is refused while pinned: pinned is a fixed framing
+await page.click("#btn-record");
+await new Promise((r) => setTimeout(r, 300));
+const pinnedToast = await page.$eval("#toast", (e) => e.textContent);
+check("recording refused while pinned", /fixed framing/.test(pinnedToast), pinnedToast);
+const recCountPinned = await page.evaluate(() => (JSON.parse(localStorage.getItem("studiogram_state")).recordings || []).length);
+check("no recording created on refusal", recCountPinned === 0);
+
+// 10. record the manually driven viewport: zoom and drag live inside the take,
+// chosen dimensions are honored, and the path captures the movement
+await page.click('#tabs button[data-tab="camera"]');
+await clickText("free orbit");
+await page.select("#rec-size", "vertical");
+await page.click("#btn-record");
+await new Promise((r) => setTimeout(r, 250));
+check("record button shows the countdown", (await page.$eval("#btn-record", (e) => e.textContent)).includes("stop"));
+check("framing overlay drawn for 9:16", !!(await page.$("#rec-frame")));
+const boxV = await page.evaluate(() => { const r = document.getElementById("viewport").getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+await page.mouse.move(boxV.x + boxV.w / 2, boxV.y + boxV.h / 2);
+await page.mouse.wheel({ deltaY: -380 });
+await new Promise((r) => setTimeout(r, 400));
+// drags must stay live while recording: the saved camera position must move
+const liveBeforeRec = await page.evaluate(() => JSON.parse(localStorage.getItem("studiogram_state")).live.position.join(","));
+await page.mouse.move(boxV.x + boxV.w / 2, boxV.y + boxV.h / 2);
+await page.mouse.down();
+for (let i = 1; i <= 10; i++) await page.mouse.move(boxV.x + boxV.w / 2 + (90 * i) / 10, boxV.y + boxV.h / 2 - (60 * i) / 10, { steps: 2 });
+await page.mouse.up();
+await new Promise((r) => setTimeout(r, 600));
+const liveAfterRec = await page.evaluate(() => JSON.parse(localStorage.getItem("studiogram_state")).live.position.join(","));
+check("pointer drags stay live during the take", liveBeforeRec !== liveAfterRec, `${liveBeforeRec} -> ${liveAfterRec}`);
+await new Promise((r) => setTimeout(r, 500));
+await page.click("#btn-record"); // stop
+await new Promise((r) => setTimeout(r, 400));
+const vid = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem("studiogram_state"));
+  const r = st.recordings && st.recordings[st.recordings.length - 1];
+  return r ? { w: r.width, h: r.height, n: r.path.length, first: JSON.stringify(r.path[0]), last: JSON.stringify(r.path[r.path.length - 1]) } : null;
+});
+check("recording saved from real input", !!vid, vid ? `${vid.n} frames` : "none");
+check("chosen dimensions honored (9:16 1080x1920)", !!vid && vid.w === 1080 && vid.h === 1920);
+check("zoom and drag moved the camera inside the take", !!vid && vid.first !== vid.last);
+
 console.log(fails.length ? `\n${fails.length} FAILURES: ${fails.join(", ")}` : "\nall drag qa checks passed");
 await browser.close();
 process.exit(fails.length ? 1 : 0);

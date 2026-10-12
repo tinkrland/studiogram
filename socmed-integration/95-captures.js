@@ -57,6 +57,7 @@ function gateRecordAtTake() {
 }
 
 async function captureFrame() {
+  if (REC) { toast("finish the video take first: the record button owns the capture"); return null; }
   settleSlides(); // the take photographs the committed state, never a mid-slide frame
   const pinned = S.live.mode === "pinned" ? currentPinned() : null;
   const cameraState = pinned

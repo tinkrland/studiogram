@@ -455,14 +455,6 @@ function defaultPose() {
     wrist: { pitch: 0, yaw: 0, roll: 0 }
   };
 }
-function defaultLights() {
-  return {
-    recipe: "soft_studio", ambience: "bright",
-    key: { on: true, color: "#fff4e6", intensity: 3.0, azimuth: 40, elevation: 55 },
-    fill: { on: true, color: "#d6e8ff", intensity: 1.1, azimuth: -55, elevation: 20 },
-    rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
-  };
-}
 const BACKDROPS = {
   paper: { bg: "#b8b5ad", center: "#f4f1ea" },
   warm_gray: { bg: "#8f887c", center: "#cfc8bd" },
@@ -483,6 +475,7 @@ function defaultState() {
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },
     cameras: [],
     photos: [],          // the photo collection: immutable records of taken frames
+    recordings: [],      // orbit video records: per-frame camera path plus snapshot
     sets: [{ id: "set1", name: "shoot 1", photo_ids: [] }],
     active_set: "set1",
   };
@@ -494,37 +487,6 @@ const METALS = {
   gold_14k_yellow: { label: "gold 14k", color: 0xe9b95c, rough: 0.17 },
   gold_14k_rose: { label: "rose gold 14k", color: 0xe2a88c, rough: 0.17 },
   bronze_cu: { label: "bronze", color: 0xc98d5f, rough: 0.28 }
-};
-const AMBIENCE = { bright: 0.95, dim: 0.45, dark: 0.16 };
-const LIGHT_RECIPES = {
-  soft_studio: {
-    label: "soft studio",
-    ambience: "bright",
-    key: { on: true, color: "#fff4e6", intensity: 3.0, azimuth: 40, elevation: 55 },
-    fill: { on: true, color: "#d6e8ff", intensity: 1.1, azimuth: -55, elevation: 20 },
-    rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
-  },
-  bright_commercial: {
-    label: "bright commercial",
-    ambience: "bright",
-    key: { on: true, color: "#ffffff", intensity: 4.6, azimuth: 25, elevation: 60 },
-    fill: { on: true, color: "#eef4ff", intensity: 2.0, azimuth: -45, elevation: 30 },
-    rim: { on: true, color: "#ffffff", intensity: 1.2, azimuth: 170, elevation: 50 }
-  },
-  dramatic_rim: {
-    label: "dramatic rim",
-    ambience: "dark",
-    key: { on: true, color: "#ffe9d2", intensity: 1.3, azimuth: 55, elevation: 35 },
-    fill: { on: true, color: "#aac4e8", intensity: 0.25, azimuth: -60, elevation: 15 },
-    rim: { on: true, color: "#ffffff", intensity: 4.4, azimuth: 160, elevation: 30 }
-  },
-  warm_gold: {
-    label: "warm gold",
-    ambience: "dim",
-    key: { on: true, color: "#ffd9a0", intensity: 3.3, azimuth: 35, elevation: 50 },
-    fill: { on: true, color: "#ffe9d0", intensity: 0.8, azimuth: -50, elevation: 25 },
-    rim: { on: true, color: "#fff3e0", intensity: 2.4, azimuth: 150, elevation: 55 }
-  }
 };
 function saveState() {
   clearTimeout(saveState._t);
@@ -655,6 +617,46 @@ function applyLighting() {
   hemi.intensity = AMBIENCE[L.ambience];
 }
 
+// the lighting domain's authored values: defaults, ambience levels, recipes
+function defaultLights() {
+  return {
+    recipe: "soft_studio", ambience: "bright",
+    key: { on: true, color: "#fff4e6", intensity: 3.0, azimuth: 40, elevation: 55 },
+    fill: { on: true, color: "#d6e8ff", intensity: 1.1, azimuth: -55, elevation: 20 },
+    rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
+  };
+}
+const AMBIENCE = { bright: 0.95, dim: 0.45, dark: 0.16 };
+const LIGHT_RECIPES = {
+  soft_studio: {
+    label: "soft studio",
+    ambience: "bright",
+    key: { on: true, color: "#fff4e6", intensity: 3.0, azimuth: 40, elevation: 55 },
+    fill: { on: true, color: "#d6e8ff", intensity: 1.1, azimuth: -55, elevation: 20 },
+    rim: { on: true, color: "#ffffff", intensity: 2.0, azimuth: 165, elevation: 45 }
+  },
+  bright_commercial: {
+    label: "bright commercial",
+    ambience: "bright",
+    key: { on: true, color: "#ffffff", intensity: 4.6, azimuth: 25, elevation: 60 },
+    fill: { on: true, color: "#eef4ff", intensity: 2.0, azimuth: -45, elevation: 30 },
+    rim: { on: true, color: "#ffffff", intensity: 1.2, azimuth: 170, elevation: 50 }
+  },
+  dramatic_rim: {
+    label: "dramatic rim",
+    ambience: "dark",
+    key: { on: true, color: "#ffe9d2", intensity: 1.3, azimuth: 55, elevation: 35 },
+    fill: { on: true, color: "#aac4e8", intensity: 0.25, azimuth: -60, elevation: 15 },
+    rim: { on: true, color: "#ffffff", intensity: 4.4, azimuth: 160, elevation: 30 }
+  },
+  warm_gold: {
+    label: "warm gold",
+    ambience: "dim",
+    key: { on: true, color: "#ffd9a0", intensity: 3.3, azimuth: 35, elevation: 50 },
+    fill: { on: true, color: "#ffe9d0", intensity: 0.8, azimuth: -50, elevation: 25 },
+    rim: { on: true, color: "#fff3e0", intensity: 2.4, azimuth: 150, elevation: 55 }
+  }
+};
 // backdrop: plain seamless studio backdrop, center lifted
 let backdropMesh = null;
 function backdropTexture() {
@@ -2452,6 +2454,7 @@ function renderCameraPanel() {
     item.appendChild(el("span", "name", c.name));
     const go = el("button", "btn mini", "go");
     go.addEventListener("click", () => {
+      if (REC) { toast("pinning is deferred until the recording ends"); return; }
       S.live.mode = "pinned"; S.live.pinned = c.name; controls.enabled = false;
       syncModeBadge(); renderCameraPanel(); saveState();
     });
@@ -2637,6 +2640,7 @@ function gateRecordAtTake() {
 }
 
 async function captureFrame() {
+  if (REC) { toast("finish the video take first: the record button owns the capture"); return null; }
   settleSlides(); // the take photographs the committed state, never a mid-slide frame
   const pinned = S.live.mode === "pinned" ? currentPinned() : null;
   const cameraState = pinned
@@ -2830,6 +2834,383 @@ async function exportCaptureSet() {
   }
   toast(`exported ${photos.length} png image${photos.length === 1 ? "" : "s"} from "${set.name}"`);
 }
+// ===== video recording: manually driven viewport capture =====
+// the owner ruled on movement after seeing the reference platform: recording
+// captures the manually driven viewport, not an orbit script. zoom in, zoom
+// out, pan, orbit, and live lighting adjustments all stay active during a
+// take, and all of it is captured per frame. the take's durable truth is the
+// per-frame camera path plus lighting deltas plus the take-time snapshot
+// (quantitative values only, the same record discipline as photos); the
+// mediarecorder take is an ephemeral preview that never enters scene state.
+// the recording's dimensions are chosen up front (viewport or a platform
+// aspect); every export re-renders the record through webcodecs into mp4,
+// mov, or webm, so the same record exports to the same bytes forever.
+const VIDEO_FPS = 30;
+const VIDEO_MAX_MS = 30000;
+const REC_SIZES = {
+  viewport: { label: "viewport" },
+  square: { label: "1:1 · 1080", width: 1080, height: 1080 },
+  portrait: { label: "4:5 · 1080x1350", width: 1080, height: 1350 },
+  vertical: { label: "9:16 · 1080x1920", width: 1080, height: 1920 },
+  wide: { label: "16:9 · 1920x1080", width: 1920, height: 1080 },
+};
+const RECORD_TAKES = new Map();  // recording id -> live take object url (memory only, never state)
+let REC = null;                   // the active take
+let VIEW_LOCKED = false;          // export and replay own the canvas while locked
+
+// recording needs a movable framing: pinned mode is a fixed view, a
+// recording from it could only be a still. the refusal is a toast, never
+// a silent no.
+function startRecording() {
+  if (REC) { stopRecording(); return true; }
+  if (S.live.mode === "pinned") {
+    toast("pinned mode is a fixed framing. resume free orbit to record a move.");
+    return false;
+  }
+  settleSlides(); // the take starts from the committed state, never a mid-slide view
+  const sizeKey = $("#rec-size").value || "viewport";
+  const preset = REC_SIZES[sizeKey];
+  const canvas = renderer.domElement;
+  const width = preset.width || (canvas.clientWidth - (canvas.clientWidth % 2));
+  const height = preset.height || (canvas.clientHeight - (canvas.clientHeight % 2));
+  REC = {
+    t0: performance.now(),
+    samples: [],
+    chunks: [],
+    sizeKey,
+    width, height,
+    snapshot: sceneCoreState(),
+    gate: gateRecordAtTake(),
+    state_hash: null,
+  };
+  sha256hex(REC.snapshot).then((h) => { if (REC) REC.state_hash = h; });
+  // the live take: the browser's native canvas capture. preview quality
+  // only; exports never come from this stream.
+  try {
+    const stream = canvas.captureStream(VIDEO_FPS);
+    const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+    if (mime) {
+      REC.recorder = new MediaRecorder(stream, { mimeType: mime });
+      REC.recorder.ondataavailable = (e) => { if (REC && e.data && e.data.size) REC.chunks.push(e.data); };
+      REC.recorder.start(250);
+    }
+  } catch (e) { /* no mediarecorder: the path is still recorded, exports still work */ }
+  let lastLighting = canonical(S.lighting);
+  const sample = () => {
+    if (!REC) return;
+    const frame = {
+      t: performance.now() - REC.t0,
+      position: [round(camera.position.x), round(camera.position.y), round(camera.position.z)],
+      target: [round(controls.target.x), round(controls.target.y), round(controls.target.z)],
+      fov: round(camera.fov),
+    };
+    // lighting is captured as deltas: a frame carries the lighting values
+    // only when they changed, so a 30s take costs a few dozen entries
+    const nowLighting = canonical(S.lighting);
+    if (nowLighting !== lastLighting) {
+      lastLighting = nowLighting;
+      frame.lighting = JSON.parse(JSON.stringify(S.lighting));
+    }
+    REC.samples.push(frame);
+    if (performance.now() - REC.t0 >= VIDEO_MAX_MS) { stopRecording(); return; }
+    REC.raf = requestAnimationFrame(sample);
+  };
+  REC.raf = requestAnimationFrame(sample);
+  REC.timer = setInterval(() => {
+    if (!REC) return;
+    updateRecordUi(Math.max(0, VIDEO_MAX_MS - (performance.now() - REC.t0)));
+  }, 100);
+  updateRecordUi(VIDEO_MAX_MS);
+  showRecFrameOverlay();
+  $("#rec-size").disabled = true;
+  toast("recording the live viewport. zoom, pan, orbit, and lighting changes are all captured.");
+  return true;
+}
+
+function updateRecordUi(msLeft) {
+  const secs = Math.ceil(msLeft / 1000);
+  $("#btn-record").textContent = `stop · ${secs}s`;
+  $("#btn-capture").disabled = true;
+  $("#vpmode").textContent = `recording · ${secs}s`;
+}
+
+// the framing overlay shows what the chosen dimensions see, so a portrait
+// take can be composed while recording into it.
+function showRecFrameOverlay() {
+  const vp = $("#viewport");
+  let ov = document.getElementById("rec-frame");
+  if (!REC || REC.sizeKey === "viewport") { if (ov) ov.remove(); return; }
+  if (!ov) { ov = document.createElement("div"); ov.id = "rec-frame"; vp.appendChild(ov); }
+  const vw = vp.clientWidth, vh = vp.clientHeight;
+  const ar = REC.width / REC.height;
+  let w = vw * 0.92, h = w / ar;
+  if (h > vh * 0.92) { h = vh * 0.92; w = h * ar; }
+  ov.style.width = w + "px";
+  ov.style.height = h + "px";
+}
+
+// resample the live samples onto the fixed export grid: one path entry per
+// exported frame, camera values lerped between the bracketing live samples,
+// lighting carried forward from the last change at or before that moment.
+function buildPath(samples, duration_ms) {
+  const n = Math.max(2, Math.round((duration_ms / 1000) * VIDEO_FPS) + 1);
+  const path = [];
+  const lerp = (a, b, f) => round(a + (b - a) * f);
+  // the lighting value in effect at each live sample, carried forward from
+  // the last change at or before it
+  let eff = null;
+  const effAt = samples.map((s) => { if (s.lighting) eff = s.lighting; return eff; });
+  const lastJson = () => (path.length ? canonical(path[path.length - 1].lighting || path[path.length - 1]) : null);
+  for (let i = 0; i < n; i++) {
+    const t = (i / (n - 1)) * duration_ms;
+    let a = samples[0], b = samples[samples.length - 1];
+    let ai = 0;
+    for (let j = 0; j < samples.length - 1; j++) {
+      if (samples[j].t <= t && samples[j + 1].t >= t) { a = samples[j]; b = samples[j + 1]; ai = j; break; }
+    }
+    const lighting = effAt[ai];
+    const span = Math.max(b.t - a.t, 1e-6);
+    const f = Math.min(Math.max((t - a.t) / span, 0), 1);
+    const entry = {
+      position: a.position.map((v, k) => lerp(v, b.position[k], f)),
+      target: a.target.map((v, k) => lerp(v, b.target[k], f)),
+      fov: lerp(a.fov, b.fov, f),
+    };
+    // store the lighting only on the frames where it changed
+    if (lighting && canonical(lighting) !== lastJson()) {
+      entry.lighting = JSON.parse(JSON.stringify(lighting));
+    }
+    path.push(entry);
+  }
+  return path;
+}
+
+// the effective lighting at a path frame, carried forward from the last
+// change at or before it. this is what export applies before rendering.
+function pathLightingAt(rec, i) {
+  let lighting = rec.snapshot.lighting;
+  for (let j = 0; j <= i && j < rec.path.length; j++) if (rec.path[j].lighting) lighting = rec.path[j].lighting;
+  return lighting;
+}
+
+function stopRecording() {
+  if (!REC) return null;
+  const duration_ms = performance.now() - REC.t0;
+  if (REC.raf) cancelAnimationFrame(REC.raf);
+  if (REC.timer) clearInterval(REC.timer);
+  const closing = REC;
+  const overlay = document.getElementById("rec-frame");
+  if (overlay) overlay.remove();
+  $("#btn-record").textContent = "record video";
+  $("#btn-capture").disabled = false;
+  $("#rec-size").disabled = false;
+  const rec = {
+    id: "v" + Math.random().toString(36).slice(2, 9),
+    name: `recording ${String(S.recordings.length + 1).padStart(2, "0")}`,
+    created_utc: nowUtc(),
+    duration_ms: Math.round(duration_ms),
+    fps: VIDEO_FPS,
+    size: closing.sizeKey,
+    width: closing.width,   // the recording's chosen dimensions; export renders at exactly these
+    height: closing.height,
+    state_hash: closing.state_hash,
+    snapshot: closing.snapshot,
+    gate: closing.gate,
+    path: buildPath(closing.samples, duration_ms),
+  };
+  const finish = () => {
+    if (closing.chunks.length) {
+      const url = URL.createObjectURL(new Blob(closing.chunks, { type: "video/webm" }));
+      RECORD_TAKES.set(rec.id, url);
+    }
+    renderCaptureStrip();
+  };
+  REC = null;
+  if (closing.recorder && closing.recorder.state !== "inactive") closing.recorder.onstop = finish;
+  else finish();
+  if (closing.recorder) closing.recorder.stop();
+  S.recordings.push(rec);
+  syncModeBadge();
+  renderCaptureStrip(); saveState();
+  toast(`${rec.name} saved: ${(rec.duration_ms / 1000).toFixed(1)}s, ${rec.path.length} frames, ${rec.width}x${rec.height}. export below.`);
+  return rec;
+}
+
+// deterministic export: re-render the record's path over its snapshot at the
+// fixed fps and the record's chosen dimensions, apply each frame's lighting,
+// encode through webcodecs, mux to the chosen container. mp4 and mov carry
+// the same h.264 track in sibling containers; webm carries vp9. the same
+// record always exports to the same bytes.
+async function renderVideoBuffer(rec, fmt) {
+  if (!["mp4", "mov", "webm"].includes(fmt)) throw new Error("unknown export format " + fmt);
+  if (typeof window.VideoEncoder === "undefined") {
+    const take = RECORD_TAKES.get(rec.id);
+    if (fmt === "webm" && take) return { liveTakeUrl: take };
+    throw new Error("no webcodecs encoder in this browser; only the live take webm is available");
+  }
+  const { Output, Mp4OutputFormat, MovOutputFormat, WebMOutputFormat, CanvasSource, BufferTarget, QUALITY_HIGH } =
+    await import("mediabunny");
+  const formats = { mp4: Mp4OutputFormat, mov: MovOutputFormat, webm: WebMOutputFormat };
+  const codec = fmt === "webm" ? "vp9" : "avc";
+  const prev = sceneCoreState();
+  const wasLocked = VIEW_LOCKED;
+  VIEW_LOCKED = true;
+  try {
+    await applyCoreState(rec.snapshot);
+    renderer.setPixelRatio(1);
+    renderer.setSize(rec.width, rec.height, false);
+    camera.aspect = rec.width / rec.height;
+    pinnedHelper.aspect = rec.width / rec.height;
+    const target = new BufferTarget();
+    const output = new Output({ format: new formats[fmt](), target });
+    const source = new CanvasSource(renderer.domElement, { codec, quality: QUALITY_HIGH });
+    output.addVideoTrack(source, { frameRate: VIDEO_FPS });
+    await output.start();
+    const dt = 1 / VIDEO_FPS;
+    for (let i = 0; i < rec.path.length; i++) {
+      const k = rec.path[i];
+      camera.position.set(...k.position);
+      controls.target.set(...k.target);
+      camera.lookAt(...k.target);
+      camera.fov = k.fov;
+      camera.updateProjectionMatrix();
+      // a lighting change captured mid-take is part of the performance
+      if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+      renderFrame();
+      await source.add(i * dt, dt);
+    }
+    await output.finalize();
+    const buffer = target.buffer;
+    return { buffer, mime: await output.getMimeType() };
+  } finally {
+    VIEW_LOCKED = wasLocked;
+    await applyCoreState(prev);
+    resize();
+    renderCaptureStrip();
+  }
+}
+
+async function exportVideo(rec, fmt) {
+  try {
+    const out = await renderVideoBuffer(rec, fmt);
+    if (out.liveTakeUrl) {
+      downloadLink(`${slug(rec.name)}.webm`, out.liveTakeUrl);
+      toast(`${rec.name} exported as the live take (no webcodecs encoder available)`);
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([out.buffer], { type: out.mime }));
+    downloadLink(`${slug(rec.name)}-${rec.width}x${rec.height}.${fmt}`, url);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast(`${rec.name} exported as ${fmt}: ${Math.round(out.buffer.byteLength / 1024)} kb, ${rec.path.length} frames`);
+  } catch (e) {
+    toast("video export failed: " + e.message);
+  }
+}
+
+// replay plays the live take while it is still in memory; after a reload
+// only the record remains, and replay re-renders the path in real time,
+// lighting changes included. both show the same performance: the path is
+// truth.
+async function replayVideo(rec) {
+  const take = RECORD_TAKES.get(rec.id);
+  if (take) {
+    const modal = $("#vidmodal");
+    const video = modal.querySelector("video");
+    video.src = take;
+    modal.querySelector(".capmodal-meta").textContent =
+      `${rec.name} · live take · ${(rec.duration_ms / 1000).toFixed(1)}s · ${rec.width}x${rec.height}`;
+    modal.style.display = "flex";
+    video.play().catch(() => {});
+    return;
+  }
+  const prev = sceneCoreState();
+  const wasLocked = VIEW_LOCKED;
+  VIEW_LOCKED = true;
+  try {
+    await applyCoreState(rec.snapshot);
+    toast(`replaying ${rec.name} from its recorded path`);
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      const step = () => {
+        const t = performance.now() - t0;
+        const i = Math.min(Math.floor((t / 1000) * VIDEO_FPS), rec.path.length - 1);
+        const k = rec.path[i];
+        camera.position.set(...k.position);
+        controls.target.set(...k.target);
+        camera.lookAt(...k.target);
+        camera.fov = k.fov;
+        camera.updateProjectionMatrix();
+        if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+        renderFrame();
+        if (t >= rec.duration_ms || i >= rec.path.length - 1) return resolve();
+        requestAnimationFrame(step);
+      };
+      step();
+    });
+  } finally {
+    VIEW_LOCKED = wasLocked;
+    await applyCoreState(prev);
+    resize();
+    renderCaptureStrip();
+  }
+}
+
+function deleteRecording(rec) {
+  S.recordings = S.recordings.filter((r) => r !== rec);
+  const url = RECORD_TAKES.get(rec.id);
+  if (url) { URL.revokeObjectURL(url); RECORD_TAKES.delete(rec.id); }
+  renderCaptureStrip(); saveState();
+}
+
+// the recordings sit in the capture bar under the photo strip. a live
+// take shows itself while it runs; finished takes show their metadata and
+// the three export modes.
+function renderVideoStrip() {
+  let row = document.getElementById("vidrow");
+  if (row) row.remove();
+  row = el("div", "vidrow");
+  row.id = "vidrow";
+  if (REC) {
+    const live = el("div", "vidcard live");
+    const secs = Math.min(VIDEO_MAX_MS, performance.now() - REC.t0) / 1000;
+    live.appendChild(el("div", "cc-meta", `recording… ${secs.toFixed(1)}s · ${REC.width}x${REC.height} · zoom/pan/orbit/lighting stay live`));
+    row.appendChild(live);
+  }
+  for (const rec of S.recordings) {
+    const card = el("div", "vidcard");
+    card.appendChild(el("div", "cc-name", rec.name));
+    const lightDeltas = rec.path.filter((f) => f.lighting).length;
+    card.appendChild(el("div", "cc-meta",
+      `${(rec.duration_ms / 1000).toFixed(1)}s · ${rec.fps}fps · ${rec.width}x${rec.height} · ${lightDeltas ? lightDeltas + " lighting change" + (lightDeltas === 1 ? "" : "s") + " · " : ""}state ${(rec.state_hash || "").slice(0, 8)}${RECORD_TAKES.has(rec.id) ? " · live take in memory" : ""}`));
+    const actions = el("div", "cc-actions");
+    const mk = (label, fn, cls) => { const b = el("button", cls || "btn mini", label); b.addEventListener("click", fn); return b; };
+    actions.append(
+      mk("replay", () => replayVideo(rec)),
+      mk("mp4", () => exportVideo(rec, "mp4")),
+      mk("mov", () => exportVideo(rec, "mov")),
+      mk("webm", () => exportVideo(rec, "webm")),
+      mk("x", () => deleteRecording(rec), "btn mini danger")
+    );
+    card.appendChild(actions);
+    row.appendChild(card);
+  }
+  if (row.children.length) $("#capstrip").appendChild(row);
+}
+
+// wrap the photo strip render so the video row refreshes with it
+const renderPhotoStrip = renderCaptureStrip;
+renderCaptureStrip = function () {
+  renderPhotoStrip();
+  renderVideoStrip();
+};
+
+$("#btn-record").addEventListener("click", () => { if (REC) stopRecording(); else startRecording(); });
+$("#vidmodal").addEventListener("click", () => {
+  const modal = $("#vidmodal");
+  modal.style.display = "none";
+  modal.querySelector("video").pause();
+});
+window.addEventListener("resize", () => { if (REC) showRecFrameOverlay(); });
 // ===== full state: export, import, reset, restore =====
 function exportSceneState() {
   const blob = new Blob([JSON.stringify(serializeState(true), null, 2)], { type: "application/json" });
@@ -3070,6 +3451,80 @@ async function runSelfTest() {
   deleteCapture(photo2);
   S.sets = S.sets.filter((x) => x.id !== "set2");
 
+  // orbit video recording: refused while pinned, the path is the record,
+  // and export re-renders deterministically into all three containers
+  S.cameras.push({ name: "selftest vid cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
+  S.live = { ...S.live, mode: "pinned", pinned: "selftest vid cam" };
+  syncModeBadge();
+  const refused = startRecording();
+  results.push("recording refused while pinned: " + (refused === false));
+  results.push("no record created on refusal: " + (S.recordings.length === 0));
+  S.cameras = S.cameras.filter((c) => c.name !== "selftest vid cam");
+  S.live = { ...S.live, mode: "orbit" };
+  controls.enabled = true; syncModeBadge();
+  camera.position.set(140, 260, 460);
+  controls.target.set(-15, 100, 40);
+  $("#rec-size").value = "square"; // the recording's chosen dimensions
+  await new Promise((r) => setTimeout(r, 80));
+  startRecording();
+  results.push("record started: " + !!REC);
+  const capBlocked = await captureFrame();
+  results.push("photo capture blocked during take: " + (capBlocked === null));
+  // a scripted move: the camera sweeps in while the take runs, as zoom would
+  for (let i = 1; i <= 5; i++) {
+    camera.position.set(140 + i * 6, 260 + i * 3, 460 - i * 24);
+    await new Promise((r) => setTimeout(r, 50));
+    if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
+  }
+  await new Promise((r) => setTimeout(r, 60));
+  const vid = stopRecording();
+  results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
+  const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
+  results.push("path moved across the take: " + moved);
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
+  results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
+  results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  results.push("record serialized in state: " + (serializeState(false).recordings.length === 1));
+  const bufEq = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every((v, i) => v === new Uint8Array(b)[i]);
+  const brand = (b) => new TextDecoder().decode(new Uint8Array(b.slice(4, 10)));
+  if (typeof window.VideoEncoder !== "undefined") {
+    const w1 = await renderVideoBuffer(vid, "webm");
+    const w2 = await renderVideoBuffer(vid, "webm");
+    results.push("webm exports byte-identical: " + (w1.buffer && w2.buffer && bufEq(w1.buffer, w2.buffer)));
+    const mp4 = await renderVideoBuffer(vid, "mp4");
+    const mov = await renderVideoBuffer(vid, "mov");
+    results.push("mp4 brand " + brand(mp4.buffer) + ", mov brand " + brand(mov.buffer));
+    results.push("mp4/mov are sibling containers not copies: " + (mp4.buffer && mov.buffer && !bufEq(mp4.buffer, mov.buffer)));
+    // demux what was written: the container must carry the whole path
+    const { Input, BlobSource, MP4, WEBM } = await import("mediabunny");
+    const trackOf = async (buf, type, formats) => {
+      const input = new Input({ formats, source: new BlobSource(new Blob([buf], { type })) });
+      const track = await input.getPrimaryVideoTrack();
+      const stats = await track.computePacketStats();
+      const codec = track.codec;
+      input.dispose();
+      return { codec, count: stats.packetCount };
+    };
+    const demuxMp4 = await trackOf(mp4.buffer, mp4.mime, [MP4]);
+    const demuxWebm = await trackOf(w1.buffer, w1.mime, [WEBM]);
+    results.push("mp4 demuxes: " + demuxMp4.codec + ", " + demuxMp4.count + " packets");
+    results.push("webm demuxes: " + demuxWebm.codec + ", " + demuxWebm.count + " packets");
+    results.push("demuxed frames match the path: " + (demuxMp4.count === vid.path.length && demuxWebm.count === vid.path.length));
+  } else {
+    results.push("webcodecs unavailable: export falls back to the live take only");
+  }
+  deleteRecording(vid);
+  // import stays tolerant of saves that predate recordings
+  const rawVid = JSON.parse(JSON.stringify(serializeState(false)));
+  rawVid.recordings = [{ id: "vx", name: "imported", created_utc: nowUtc(), duration_ms: 900, fps: 30, width: 2, height: 2, state_hash: "", snapshot: null, gate: [], path: [{ position: [1, 1, 1], target: [0, 0, 0], fov: 26 }] }];
+  await applyFullState(rawVid);
+  results.push("recording imported from state: " + (S.recordings.length === 1 && S.recordings[0].path.length === 1));
+  const rawNoVid = JSON.parse(JSON.stringify(serializeState(false)));
+  delete rawNoVid.recordings;
+  await applyFullState(rawNoVid);
+  results.push("import tolerates missing recordings: " + (Array.isArray(S.recordings) && S.recordings.length === 0));
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -3138,6 +3593,80 @@ async function runSceneAudit() {
     else other++;
   }
   results.push("pixels: backdropish " + backdropish + ", dark " + dark + ", other " + other);
+  // orbit video recording: refused while pinned, the path is the record,
+  // and export re-renders deterministically into all three containers
+  S.cameras.push({ name: "selftest vid cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
+  S.live = { ...S.live, mode: "pinned", pinned: "selftest vid cam" };
+  syncModeBadge();
+  const refused = startRecording();
+  results.push("recording refused while pinned: " + (refused === false));
+  results.push("no record created on refusal: " + (S.recordings.length === 0));
+  S.cameras = S.cameras.filter((c) => c.name !== "selftest vid cam");
+  S.live = { ...S.live, mode: "orbit" };
+  controls.enabled = true; syncModeBadge();
+  camera.position.set(140, 260, 460);
+  controls.target.set(-15, 100, 40);
+  $("#rec-size").value = "square"; // the recording's chosen dimensions
+  await new Promise((r) => setTimeout(r, 80));
+  startRecording();
+  results.push("record started: " + !!REC);
+  const capBlocked = await captureFrame();
+  results.push("photo capture blocked during take: " + (capBlocked === null));
+  // a scripted move: the camera sweeps in while the take runs, as zoom would
+  for (let i = 1; i <= 5; i++) {
+    camera.position.set(140 + i * 6, 260 + i * 3, 460 - i * 24);
+    await new Promise((r) => setTimeout(r, 50));
+    if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
+  }
+  await new Promise((r) => setTimeout(r, 60));
+  const vid = stopRecording();
+  results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
+  const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
+  results.push("path moved across the take: " + moved);
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
+  results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
+  results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  results.push("record serialized in state: " + (serializeState(false).recordings.length === 1));
+  const bufEq = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every((v, i) => v === new Uint8Array(b)[i]);
+  const brand = (b) => new TextDecoder().decode(new Uint8Array(b.slice(4, 10)));
+  if (typeof window.VideoEncoder !== "undefined") {
+    const w1 = await renderVideoBuffer(vid, "webm");
+    const w2 = await renderVideoBuffer(vid, "webm");
+    results.push("webm exports byte-identical: " + (w1.buffer && w2.buffer && bufEq(w1.buffer, w2.buffer)));
+    const mp4 = await renderVideoBuffer(vid, "mp4");
+    const mov = await renderVideoBuffer(vid, "mov");
+    results.push("mp4 brand " + brand(mp4.buffer) + ", mov brand " + brand(mov.buffer));
+    results.push("mp4/mov are sibling containers not copies: " + (mp4.buffer && mov.buffer && !bufEq(mp4.buffer, mov.buffer)));
+    // demux what was written: the container must carry the whole path
+    const { Input, BlobSource, MP4, WEBM } = await import("mediabunny");
+    const trackOf = async (buf, type, formats) => {
+      const input = new Input({ formats, source: new BlobSource(new Blob([buf], { type })) });
+      const track = await input.getPrimaryVideoTrack();
+      const stats = await track.computePacketStats();
+      const codec = track.codec;
+      input.dispose();
+      return { codec, count: stats.packetCount };
+    };
+    const demuxMp4 = await trackOf(mp4.buffer, mp4.mime, [MP4]);
+    const demuxWebm = await trackOf(w1.buffer, w1.mime, [WEBM]);
+    results.push("mp4 demuxes: " + demuxMp4.codec + ", " + demuxMp4.count + " packets");
+    results.push("webm demuxes: " + demuxWebm.codec + ", " + demuxWebm.count + " packets");
+    results.push("demuxed frames match the path: " + (demuxMp4.count === vid.path.length && demuxWebm.count === vid.path.length));
+  } else {
+    results.push("webcodecs unavailable: export falls back to the live take only");
+  }
+  deleteRecording(vid);
+  // import stays tolerant of saves that predate recordings
+  const rawVid = JSON.parse(JSON.stringify(serializeState(false)));
+  rawVid.recordings = [{ id: "vx", name: "imported", created_utc: nowUtc(), duration_ms: 900, fps: 30, width: 2, height: 2, state_hash: "", snapshot: null, gate: [], path: [{ position: [1, 1, 1], target: [0, 0, 0], fov: 26 }] }];
+  await applyFullState(rawVid);
+  results.push("recording imported from state: " + (S.recordings.length === 1 && S.recordings[0].path.length === 1));
+  const rawNoVid = JSON.parse(JSON.stringify(serializeState(false)));
+  delete rawNoVid.recordings;
+  await applyFullState(rawNoVid);
+  results.push("import tolerates missing recordings: " + (Array.isArray(S.recordings) && S.recordings.length === 0));
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";
@@ -3149,7 +3678,7 @@ async function runSceneAudit() {
   resize();
   if (location.hash.includes("selftest")) {
     await runSelfTest();
-    function animate() { requestAnimationFrame(animate); if (S.live.mode === "orbit") controls.update(); renderFrame(); }
+    function animate() { requestAnimationFrame(animate); if (VIEW_LOCKED) return; if (S.live.mode === "orbit") controls.update(); renderFrame(); }
     animate();
     return;
   }
@@ -3176,6 +3705,7 @@ async function runSceneAudit() {
 
   function animate() {
     requestAnimationFrame(animate);
+    if (VIEW_LOCKED) return; // video export/replay owns the canvas while locked
     if (S.live.mode === "orbit") controls.update();
     renderFrame();
   }
