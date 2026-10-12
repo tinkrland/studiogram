@@ -82,9 +82,9 @@ invariants, which this build must keep:
 ## next-pass priorities, in order
 
 status: mesh consumption (1) and vendoring three (3) are closed; manual
-backdrop values and stack reorder landed in the same spec pass. the open
-order is the license review (2), then the catalog slide-on and photo
-specs (4, 5), then earlobe (6, owner-gated).
+backdrop values and stack reorder landed in the same spec pass; the catalog
+slide-on (4) and photo objects with capture sets (5) are built and green.
+the open order is the license review (2), then earlobe (6, owner-gated).
 
 1. ~~**release mesh consumption.**~~ done: fixture records carry the
    compiled glb (data-uri) plus `mesh_glb_sha256` over the glb bytes; the
@@ -123,17 +123,20 @@ specs (4, 5), then earlobe (6, owner-gated).
    in GLTFLoader) and inlined into the artifact as data-uris. no external
    runtime dependency remains.
 
-4. **catalog slide-on and seating.** specced in
-   [spec/catalog-to-scene.md](spec/catalog-to-scene.md): artist catalog
-   grouping, the physical slide-on transition (derived, stateless, not
-   the parked movement phase), sliding seat changes with collision
-   clamping, and the advisory fit rule (never a gate).
+4. ~~**catalog slide-on and seating.**~~ done: artist catalog grouping,
+   the slide-on transition (450ms ease-out, pure view layer, off with a
+   toggle or prefers-reduced-motion), sliding seats with contact clamping
+   (offset + width + 0.25mm), the per-finger fit band derived from boneLen
+   replacing the hard-coded slider range, and advisory-only fit hints from
+   a per-finger radius sampled at load. still specced in
+   [spec/catalog-to-scene.md](spec/catalog-to-scene.md).
 
-5. **photo objects and capture sets.** specced in
-   [spec/photo-taking.md](spec/photo-taking.md): the photo as an
-   immutable record (camera values are truth, camera name is
-   provenance, gate entries recorded at take time), named ordered
-   capture sets as the recording of a shoot, batch reproduce.
+5. ~~**photo objects and capture sets.**~~ done: state v2 — photos carry
+   camera values (truth), camera name (provenance), and the gate array at
+   take time; named ordered capture sets with per-set numbering,
+   set-prefixed export filenames, batch reproduce; v1 saves migrate to a
+   single "shoot 1" set on import. still specced in
+   [spec/photo-taking.md](spec/photo-taking.md).
 
 6. **earlobe placement.** the scope supports finger, wrist, and earlobe;
    the build supports finger and wrist. earlobe needs authored ear
