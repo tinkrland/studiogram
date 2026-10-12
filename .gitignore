@@ -3,10 +3,10 @@ blender-4.2.7-linux-x64/
 # node deps for local syntax checks
 node_modules/
 # regenerable analysis intermediates
-app/distal-mask.bin
-app/tex-lum.bin
+customized-hands/tex-lum.bin
+customized-hands/distal-mask.bin
 # one-off qa renders from the verification loop
-app/preview*.png
-app/pose_*.png
+artifact/preview*.png
+posing-studio/pose_*.png
 *.zip
 .env

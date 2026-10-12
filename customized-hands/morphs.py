@@ -282,7 +282,7 @@ if fore_seg and uvl:
         hair_pts.append((round(u, 5), round(1.0 - v, 5)))
     stride = max(1, len(hair_pts) // 2200)
     hair_pts = hair_pts[::stride]
-open("app/hair-region.json", "w").write(json.dumps(hair_pts))
+open("customized-hands/hair-region.json", "w").write(json.dumps(hair_pts))
 print("HAIRPTS", len(hair_pts))
 
 # --- material, same as export_hand.py ---
@@ -322,7 +322,7 @@ arm.select_set(True)
 hand.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.export_scene.gltf(
-    filepath="app/hand.glb",
+    filepath="assets/hand.glb",
     export_format="GLB",
     use_selection=True,
     export_apply=True,
@@ -336,4 +336,4 @@ bpy.ops.export_scene.gltf(
     export_image_format="AUTO",
     export_extras=False,
 )
-print("GLBSIZE", os.path.getsize("app/hand.glb"))
+print("GLBSIZE", os.path.getsize("assets/hand.glb"))

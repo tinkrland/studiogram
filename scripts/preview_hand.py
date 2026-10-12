@@ -72,13 +72,13 @@ scene.world = world
 world.use_nodes = True
 bg = world.node_tree.nodes.get("Background")
 if bg: bg.inputs["Color"].default_value = (0.9, 0.88, 0.85, 1)
-scene.render.filepath = "app/preview1.png"
+scene.render.filepath = "artifact/preview1.png"
 bpy.ops.render.render(write_still=True)
 print("preview1 rendered")
 # second angle: from the other side
 cam.location = (-1.6, 1.0, 1.7)
 direction = dir_target - cam.location
 cam.rotation_euler = (direction.to_track_quat("-Z", "Y")).to_euler()
-scene.render.filepath = "app/preview2.png"
+scene.render.filepath = "artifact/preview2.png"
 bpy.ops.render.render(write_still=True)
 print("preview2 rendered")

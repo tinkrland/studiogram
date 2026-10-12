@@ -181,10 +181,10 @@ for name, fn in POSES.items():
         if abs(r.x) > 1e-5 or abs(r.y) > 1e-5 or abs(r.z) > 1e-5:
             deltas[b.name] = [round(r.x, 4), round(r.y, 4), round(r.z, 4)]
     presets[name] = deltas
-    scene.render.filepath = f"app/pose_{name}.png"
+    scene.render.filepath = f"posing-studio/pose_{name}.png"
     bpy.ops.render.render(write_still=True)
     print("rendered", name, "bones touched:", len(deltas))
 
-with open("app/poses.json", "w") as f:
+with open("posing-studio/poses.json", "w") as f:
     json.dump(presets, f, indent=1)
 print("poses written:", list(presets.keys()))

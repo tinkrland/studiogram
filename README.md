@@ -31,30 +31,25 @@ credit; the license travels with every use).
 
 ## layout
 
-- `app/` — the studio application: the eight ordered source `parts/`, the
-  registry fixtures, and the deterministic build inputs (hand model glb,
-  authored poses, exported uv regions, base textures).
-- `artifact/` — the deterministic build outputs: `index.html`, the
-  self-contained one-artifact studio, and its node-checkable `app.mjs` twin.
-- `assets/rigged-hand/` — the licensed model sources ('Rigged Hand' by
-  DennisH2010, CC BY-SA 3.0; license and credit kept attached).
-- `scripts/` — the pipeline: `build-app.sh` concatenates the parts and
-  inlines the fixtures, poses, uv regions and the glb; `export*.py`,
-  `morphs.py`, `poses.py` run inside blender 4.2 (not included) against
-  the source blend; `nails_extract.cjs` derives nail-plate uv regions from
-  the exported glb; `inspect_*` and the test scripts are the qa loop.
-- `functions/serve-studiogram.ts` — deno endpoint that serves the built
-  artifact with the right content type.
+the repo reads as the product's feature map; the build reads as one
+ordered program. each domain folder holds its runtime code (split at the
+original section boundaries, so the manifest concatenation reproduces
+the artifact byte-for-byte) plus its authored inputs and scripts.
 
-## build
-
-```
-scripts/build-app.sh
-```
-
-outputs `artifact/index.html` and runs a node syntax check on
-`artifact/app.mjs`. regenerating the glb / poses / uv regions requires
-blender 4.2 on the path and re-running the export scripts in `scripts/`.
+- `dollification/` — the porcelain display-hand finish
+- `customized-hands/` — the hand model, authored blend targets, the
+  surface layer (tone, hair, nails, tattoos) and the subject panel
+- `posing-studio/` — pose presets as authored joint rotations + the pose panel
+- `jewelry/` — procedural rings and bracelets + their panel
+- `camera/` — free orbit, pinned deterministic shots, the lens trio
+- `lighting/` — the three-light studio rig + its panel
+- `setdesign/` — backdrops and scene composition + the scene panel
+- `socmed-integration/` — the capture set: frame, reproduce, png export
+- `core/` — shell, utils, state, registry fixtures, render composite,
+  panels infra, state import/export, boot, the in-app qa hooks
+- `assets/` — the exported `hand.glb` and the licensed model sources
+- `scripts/` — generic pipeline (build, glb export, inspection, qa tests)
+- `artifact/` — the deterministic outputs: `index.html` and `app.mjs`
 
 ## invariants
 

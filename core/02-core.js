@@ -38,3 +38,4 @@ const nowUtc = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 // and a tamper-evident hash chain: mesh_sha256 over the mesh spec, record_hash
 // over the record, prev_hash linking to the predecessor. the ingestion gate
 // recomputes all of it and never trusts a declared claim.
+

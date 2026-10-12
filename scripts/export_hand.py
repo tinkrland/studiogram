@@ -74,7 +74,7 @@ arm.select_set(True)
 hand.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.export_scene.gltf(
-    filepath="app/hand.glb",
+    filepath="assets/hand.glb",
     export_format="GLB",
     use_selection=True,
     export_apply=True,
@@ -87,4 +87,4 @@ bpy.ops.export_scene.gltf(
     export_image_format="AUTO",
     export_extras=False,
 )
-print("GLBSIZE", os.path.getsize("app/hand.glb"))
+print("GLBSIZE", os.path.getsize("assets/hand.glb"))

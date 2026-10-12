@@ -147,3 +147,4 @@ function removeJewelryInstance(iid) {
 function supportedLocations(rec) {
   return rec.parameters.placement.locations; // e.g. ["finger"] or ["wrist"]
 }
+

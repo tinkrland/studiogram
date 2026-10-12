@@ -201,3 +201,4 @@ function serializeState(withThumbs) {
   });
   return { ...S, captures: caps };
 }
+
