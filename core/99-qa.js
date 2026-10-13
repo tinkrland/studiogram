@@ -107,6 +107,14 @@ async function runSelfTest() {
   results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
   deleteCapture(photoBackToBack);
   results.push("photo camera name: " + photo.camera.name + ", mode: " + photo.camera.mode);
+  // pinned depth of field comes from the pinned camera record, not the live
+  // sliders: moving the sliders while pinned must not change the frame.
+  const pinnedPng = await renderPng(200, 200);
+  const saveFl = S.live.focallength, saveFd = S.live.focaldistance;
+  S.live.focallength = 135; S.live.focaldistance = 120;
+  const movedPng = await renderPng(200, 200);
+  S.live.focallength = saveFl; S.live.focaldistance = saveFd;
+  results.push("pinned render ignores live focus sliders: " + (pinnedPng === movedPng));
   results.push("photo gate record: " + JSON.stringify(photo.gate));
   const takePng = CAPTURE_IMG.get(photo.id);
   S.cameras.find((c) => c.name === "selftest cam").position = [300, 400, 500];
@@ -142,6 +150,49 @@ async function runSelfTest() {
   deleteCapture(photo2);
   S.sets = S.sets.filter((x) => x.id !== "set2");
 
+  // nails: a real plate per finger, shape from the library, length from a slider
+  {
+    const reachMm = (shape, len, finger) => {
+      S.hand.nails.shape = shape; S.hand.nails.length = len; applyNails();
+      const m = NAIL.plates.get(finger), pp = m.geometry.attributes.position;
+      let maxY = -1e9; for (let i = 0; i < pp.count; i++) maxY = Math.max(maxY, pp.getY(i));
+      return (maxY - NAIL_FRAME[finger].tip) * 1000;
+    };
+    results.push("nail plates built for all five fingers: " + (NAIL.plates.size === 5));
+    const r0 = reachMm("square", 0, "index"), r5 = reachMm("square", 0.5, "index"), r1 = reachMm("square", 1, "index");
+    results.push("nail length slider extends the free edge monotonically: " + (r0 < r5 && r5 < r1) + " (" + r0.toFixed(1) + " / " + r5.toFixed(1) + " / " + r1.toFixed(1) + " mm)");
+    const sty = reachMm("stiletto", 0.8, "index"), sqr = reachMm("square", 0.8, "index"), nat = reachMm("natural", 0.8, "index");
+    results.push("natural nail ignores the length slider: " + (nat < 1.0) + " (" + nat.toFixed(1) + " mm)");
+    results.push("stiletto reaches further than square at the same slider: " + (sty > sqr));
+    const tipW = (shape) => {
+      S.hand.nails.shape = shape; S.hand.nails.length = 0.8; applyNails();
+      const pp = NAIL.plates.get("index").geometry.attributes.position, NU = 29, NV = pp.count / NU;
+      return (pp.getX((NV - 1) * NU + 28) - pp.getX((NV - 1) * NU)) * 1000;
+    };
+    results.push("stiletto tip is narrower than square tip: " + (tipW("stiletto") < tipW("square") * 0.5) + " (" + tipW("stiletto").toFixed(1) + " vs " + tipW("square").toFixed(1) + " mm)");
+    results.push("every library shape builds a finite plate: " + NAIL_SHAPE_ORDER.every((k) => { reachMm(k, 0.7, "middle"); const pp = NAIL.plates.get("middle").geometry.attributes.position; for (let i = 0; i < pp.count; i++) if (!Number.isFinite(pp.getX(i) + pp.getY(i) + pp.getZ(i))) return false; return true; }) + " (" + NAIL_SHAPE_ORDER.length + " shapes)");
+    S.hand.nails.shape = "oval"; S.hand.nails.length = 0.3; applyNails();
+  }
+  // skin presets land on their swatch, sliders move the right way, old saves migrate
+  {
+    const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const keep = JSON.stringify(S.hand.skin), keepFinish = S.hand.finish;
+    S.hand.finish = "skin"; applyFinish();
+    const uv = HAND.skinned.geometry.attributes.uv; let worst = 0;
+    for (const pr of SKIN_PRESETS) {
+      S.hand.skin = { preset: pr.key, lightness: 0, warmth: 0, depth: 0, hair: 0 }; applySurface();
+      const cv = HAND.surfaceCanvas.get(0), W = cv.width, d = cv.getContext("2d").getImageData(0, 0, W, W).data;
+      let r = 0, g = 0, b = 0;
+      for (let i = 0; i < uv.count; i++) { const o = (Math.min(W - 1, Math.floor(uv.getY(i) * W)) * W + Math.min(W - 1, Math.floor(uv.getX(i) * W))) * 4; r += d[o]; g += d[o + 1]; b += d[o + 2]; }
+      const t = hexRgb(pr.hex); worst = Math.max(worst, Math.abs(r / uv.count - t[0]), Math.abs(g / uv.count - t[1]), Math.abs(b / uv.count - t[2]));
+    }
+    results.push("skin presets render within 8 levels of their swatch: " + (worst <= 8) + " (worst " + worst.toFixed(1) + ", " + SKIN_PRESETS.length + " presets)");
+    const lum = (h) => { const c = hexRgb(h); return c[0] * .2126 + c[1] * .7152 + c[2] * .0722; };
+    const at = (o) => { S.hand.skin = { preset: "tan", lightness: 0, warmth: 0, depth: 0, hair: 0, ...o }; return skinAlbedoHex(); };
+    results.push("skin lightness slider orders correctly: " + (lum(at({ lightness: 0.5 })) > lum(at({})) && lum(at({})) > lum(at({ lightness: -0.5 }))));
+    results.push("old skin.tone saves migrate to a preset: " + (migrateSkin({ tone: 0.4 }).preset === "bronze" && migrateSkin({ tone: 1 }).preset === "espresso" && migrateSkin({ tone: 0.4, hair: 0.2 }).hair === 0.2 && migrateSkin(undefined).preset === "golden"));
+    S.hand.skin = JSON.parse(keep); S.hand.finish = keepFinish; applyFinish(); applySurface();
+  }
   // commerce export: the listing manifest gate, the photo-to-listing join
   // through the gate record, and deterministic made-to-order feed rows
   const prevListings = LISTINGS, prevManifestMeta = MANIFEST_META;
@@ -172,7 +223,6 @@ async function runSelfTest() {
   results.push("empty manifest after refusal binds no products: " + (photoProducts(cphoto).length === 0));
   deleteCapture(cphoto);
   LISTINGS = prevListings; MANIFEST_META = prevManifestMeta; storeListings(); renderCommerceBar();
-
   // orbit video recording: refused while pinned, the path is the record,
   // and export re-renders deterministically into all three containers
   S.cameras.push({ name: "selftest vid cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
@@ -421,6 +471,9 @@ async function runSceneAudit() {
   renderGateEntries();
   renderPanel("subject");
   if (location.hash.includes("audit")) setTimeout(runSceneAudit, 9000);
+  // qa handle: the visual check scripts (scripts/nail-sheet.mjs) reach the
+  // module-scoped scene through this, only when the url asks for it
+  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER };
   renderCaptureStrip();
   updateVpOverlay();
   syncModeBadge();

@@ -13,7 +13,6 @@ in program order — the split parts reproduce the artifact byte-for-byte.
 
 ```text
 spec/                 working specs the next pass builds from
-                      (social-commerce.md, social-commerce-publish.md)
 dollification/        the porcelain display-hand finish
   58-finish.js
 
@@ -53,10 +52,6 @@ setdesign/            scene composition
 
 socmed-integration/   creator outputs
   95-captures.js        capture set: frame, reproduce, strip, png export
-  96-commerce.js        listing manifest import, commerce card, catalog feeds
-  98-publish.js         the publish glue: connect instagram, post the set
-  api/                  per-platform product-api contracts (verified 2026-10-13)
-  platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
   platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
 
 core/                 the spine
@@ -87,16 +82,9 @@ scripts/
                         pinned record the pinned camera.
   export*.py, inspect_*, preview_hand.py, geotest*, normaltest*
                         the blender pipeline and offline qa
-  qa-commerce.mjs      node qa of the feed/card builders (no browser)
-  qa-publish.mjs       node qa of the publish glue payload builders
 
-functions/             the publish glue backend (this app's functions)
+functions/
   serve-studiogram.ts  serves the built artifact
-  studioPublishConfig  tells the artifact if the instagram app exists
-  studioOauthCallback  exchanges the oauth code (secret stays server-side)
-  studioUploadPhoto    stores a jpeg frame, returns its public url
-  studioPhoto          serves the stored jpeg bytes (instagram fetches)
-  studioPublishCarousel  child containers -> carousel -> publish
 ```
 
 ## naming

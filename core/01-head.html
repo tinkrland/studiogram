@@ -164,6 +164,17 @@
     transition: opacity 0.25s; pointer-events: none; z-index: 50;
   }
   #toast.show { opacity: 1; }
+  .skin-swatches { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .skin-row { display: flex; align-items: center; gap: 6px; }
+  .skin-group { width: 48px; font-size: 10.5px; color: var(--dim); letter-spacing: 0.04em; }
+  .skin-swatch { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); cursor: pointer; padding: 0; }
+  .skin-swatch:hover { transform: scale(1.12); }
+  .skin-swatch.sel { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nail-shapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+  .nail-shape { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px 5px; background: var(--panel2); color: var(--dim); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; font-family: inherit; }
+  .nail-shape span { font-size: 9.5px; line-height: 1.1; text-align: center; }
+  .nail-shape:hover { color: var(--text); }
+  .nail-shape.sel { color: var(--accent); border-color: var(--accent); background: var(--panel); }
   #capmodal {
     position: fixed; inset: 0; z-index: 90; background: rgba(10, 10, 12, 0.92);
     display: none; align-items: center; justify-content: center; cursor: zoom-out;

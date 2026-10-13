@@ -58,9 +58,12 @@ invariants, which this build must keep:
 
 - subject: rigged hand (8970 verts, 33 bones), five pose presets, per-
   finger curl/spread, wrist framing; seven authored blend targets plus
-  presentation presets; surface layer (tone tint, follicle hair, nail
-  polish from extracted nail plates, atlas-painted tattoos); porcelain or
-  skin finish.
+  presentation presets; surface layer (skin tones sampled from the
+  owner's uploaded swatch charts: nine presets, light to deep, each with
+  lightness/warmth/depth adjustments, follicle hair, atlas-painted
+  tattoos); porcelain or skin finish. nails are real geometry: a plate
+  per fingertip, shape picked from a 19-shape library, then a length
+  slider (natural ignores length); polish tints the plate itself.
 - jewelry: release records now carry their compiled mesh (a glb embedded as
   a data-uri plus a sha-256 over the glb bytes). the scene renders the
   compiled mesh through GLTFLoader: what is shown is what is manufactured.
@@ -165,26 +168,6 @@ the open order is the license review (2), then earlobe (6, owner-gated).
    thumbs from saves). specced in
    [spec/photo-taking.md](spec/photo-taking.md).
 
-9. **social commerce export.** the decoupled listing layer, ruled by
-   the owner (2026-10-13): the studio never authors commerce values.
-   the platform exports a listing manifest (sku, title, price, pdp url,
-   keyed by release reference); the studio imports it through the
-   provenance gate (known release, matching version, mesh hash equal to
-   the registry's, or the row is refused), keeps it beside scene state
-   (never inside it, invariant 5), and joins it to photos through the
-   verified gate entries' `mesh_sha256` at export time. exports: the
-   per-set commerce card (json sidecar pairing with the exported pngs,
-   composed alt text, product rows with the hash binding) and catalog
-   feed csvs (google/pinterest, meta, tiktok) carrying the made-to-order
-   rules (identifier_exists false, mpn = release id, in_stock plus a
-   published handling window, quantity override 1). the commerce bar in
-   the capture strip carries import, card, and feed buttons. built per
-   [spec/social-commerce.md](spec/social-commerce.md); node qa green
-   (`scripts/qa-commerce.mjs`); the in-artifact selftest covers the
-   gate, join, card, and feed determinism. lives on the `commerce`
-   orphan branch, rooted on main c73018b so the artifact builds
-   standalone.
-
 ## deliberately parked: do not pull into this pass
 
 - props. the background prop library with meta sam reconstruction is a
@@ -192,12 +175,9 @@ the open order is the license review (2), then earlobe (6, owner-gated).
   scenes here keep plain seamless backdrops; scene state carries no prop
   slots.
 - wearables (vr/ar try-on). future version, not scheduled.
-- anything platform-side that decides commerce: listings, pricing,
-  orders, checkout, feed uploads. the commerce export layer (pass 9) is
-  the one deliberate exception and only because it is decoupled: the
-  studio imports the platform's listing manifest by reference, gates it
-  against the registry, and exports cards and feeds. it authors no
-  commerce value of its own.
+- anything platform-side: listings, pricing, orders, checkout. captures
+  may someday be attached to listing content, but this repo never touches
+  commerce.
 
 ## state and schema discipline
 

@@ -72,8 +72,13 @@ function renderFrame() {
   compMat.uniforms.tDepth.value = rtDepth;
   compMat.uniforms.uNear.value = activeCam.near;
   compMat.uniforms.uFar.value = activeCam.far;
-  compMat.uniforms.uFocus.value = S.live.focaldistance;
-  compMat.uniforms.uAperture.value = apertureFromFocalLength(S.live.focallength);
+  // focus follows the active camera: pinned shots use the focus the pinned
+  // camera recorded, so the blurred backdrop is the set the creator pinned.
+  // live orbit uses the sliders. otherwise a stale slider would bleed into
+  // every pinned render and its deterministic reproduction.
+  const [lensFl, lensFd] = activeLens();
+  compMat.uniforms.uFocus.value = lensFd;
+  compMat.uniforms.uAperture.value = apertureFromFocalLength(lensFl);
   compMat.uniforms.uTexel.value.set(1 / rt.width, 1 / rt.height);
   renderer.setRenderTarget(rt);
   renderer.clear();

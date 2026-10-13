@@ -27,6 +27,12 @@ controls.addEventListener("change", () => {
 });
 const round = (v) => Math.round(v * 10) / 10;
 
+// the lens values in effect: the pinned camera's own focus when pinned,
+// the live sliders in orbit. renderFrame's focus matches this exactly.
+function activeLens() {
+  const pin = S.live.mode === "pinned" ? currentPinned() : null;
+  return pin ? [pin.focallength, pin.focaldistance] : [S.live.focallength, S.live.focaldistance];
+}
 function syncModeBadge() {
   $("#vpmode").textContent = S.live.mode === "pinned" ? `pinned: ${S.live.pinned}` : "free orbit";
 }
@@ -34,6 +40,6 @@ function updateVpOverlay() {
   const n = S.jewelry.length;
   $("#vpoverlay").innerHTML =
     `<b>studiogram</b> · ${n} artifact${n === 1 ? "" : "s"} in scene<br>` +
-    `fov ${S.live.fov.toFixed(0)} · focallength ${S.live.focallength} · focaldistance ${S.live.focaldistance}`;
+    `fov ${activeCamera().fov.toFixed(0)} · focallength ${activeLens()[0]} · focaldistance ${activeLens()[1]}`;
 }
 
