@@ -14,8 +14,8 @@ export), and the photo record model of [photo-taking.md](photo-taking.md).
 ## principle: the path is the record, the file is an export
 
 a photo's truth is its camera values plus snapshot; a video's truth is
-the same plus time: a per-frame camera path with per-frame lighting
-and backdrop changes. the recording that ships is re-rendered from the record, never
+the same plus time: a per-frame camera path with per-frame lighting,
+backdrop, and framing changes. the recording that ships is re-rendered from the record, never
 the live-compressed take. this keeps the one invariant the studio is
 built on: exports are deterministic renders of recorded state, so the
 same record exports to the same bytes in any of the three formats,
@@ -33,7 +33,7 @@ recording: {
   state_hash,             // sha-256 over the core scene state at the take
   snapshot,               // the full core scene state at the take
   gate: [ ... ],          // gate entries at take time (same as a photo)
-  path: [ { position, target, fov, lighting?, environment? }, ... ]  // per-frame, fixed timestep
+  path: [ { position, target, fov, lighting?, environment?, size? }, ... ]  // per-frame, fixed timestep
 }
 ```
 
@@ -51,8 +51,9 @@ recording: {
   not part of the record; the take starts from the committed state.
   lighting and the backdrop set are the live exceptions because the
   owner called them out.
-- `width`/`height` are the recording's chosen dimensions (d3); export
-  renders at exactly these.
+- `width`/`height` are the recording's final dimensions (d3); earlier
+  framings live in the path as `size` delta frames and export renders
+  each segment at exactly its own dimensions (union letterbox).
 - recordings live in a scene-level `recordings: []` array; the field is
   additive, `state_version` stays 2, and restore tolerates saves without
   it (missing field defaults to []). a recording is not a photo: capture
@@ -91,9 +92,17 @@ recording: {
   a full aspect-aware photo export stays its own parked pass.
 - during the take a framing overlay shows what the chosen dimensions
   see, so a portrait take can be composed while recording into it.
-  the selector is disabled mid-take: dimensions are a property of the
-  record, not a live knob.
-- export renders the scene at exactly the record's width and height.
+- the selector stays live during the take, rooms.xyz-style: the operator
+  may switch framing while recording, each switch is captured per frame
+  (delta-encoded, carried forward like lighting and the backdrop set),
+  and the record's `width`/`height` are the final framing.
+- export: a video track has one fixed size, so mixed framings render
+  each segment at its own exact dimensions onto the union canvas of
+  every size the take used, centered and letterboxed (black bars).
+  takes that never switched framing export whole, unchanged.
+- the export grid clamps to the end brackets: a frame after the last
+  live sample uses the last bracket, never the opening sample, so the
+  final frame keeps the take's closing lighting, backdrop, and framing.
 
 ### d4. deterministic export (mp4, mov, webm)
 
@@ -125,8 +134,10 @@ recording: {
 - selftest: record a scripted path, export webm twice, assert
   byte-identical outputs (export determinism).
 - selftest: a mid-take lighting change lands in the path as delta
-  frames and carries forward to the last frame; the chosen dimensions
-  are honored by the record.
+  frames and carries forward to the last frame; a mid-take framing
+  switch lands the same way (seed frame plus one delta per switch), the
+  record's dimensions are the final framing, and export stays
+  byte-identical across mixed framings.
 - selftest: demux the exported mp4 and webm (mediabunny Input): the
   avc and vp9 tracks each carry exactly the path's frame count.
 - selftest: a recording survives reload with metadata intact; a save

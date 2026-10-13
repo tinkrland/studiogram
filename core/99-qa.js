@@ -219,16 +219,21 @@ async function runSelfTest() {
     await new Promise((r) => setTimeout(r, 50));
     if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
     if (i === 3) { prevEnv = S.environment; S.environment = { bg: "#304a5e", center: "#4a6a86", preset: "mid-take set" }; applyEnvironment(); } // live backdrop change, captured mid-take
+    if (i === 4) { $("#rec-size").value = "portrait"; $("#rec-size").dispatchEvent(new Event("change")); } // live framing switch, rooms.xyz-style
   }
   await new Promise((r) => setTimeout(r, 60));
   const vid = stopRecording();
   results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
   const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
   results.push("path moved across the take: " + moved);
-  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1350) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ", final framing)");
   const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
   results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
   results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  const sizeDeltas = vid ? vid.path.filter((f) => f.size).length : 0;
+  const lastSize = vid ? videoSizeAt(vid, vid.path.length - 1) : null;
+  results.push("framing switch captured mid-take: " + (sizeDeltas >= 2) + " (" + sizeDeltas + " size delta frames, opening square -> portrait)");
+  results.push("framing carried to the last frame: " + (lastSize && lastSize.key === "portrait" && lastSize.width === 1080 && lastSize.height === 1350));
   const envDeltas = vid ? vid.path.filter((f) => f.environment).length : 0;
   results.push("backdrop change captured mid-take: " + (envDeltas >= 1) + " (" + envDeltas + " delta frames)");
   // the record is deltas: the value in effect at the last frame is the
@@ -371,16 +376,21 @@ async function runSceneAudit() {
     await new Promise((r) => setTimeout(r, 50));
     if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
     if (i === 3) { prevEnv = S.environment; S.environment = { bg: "#304a5e", center: "#4a6a86", preset: "mid-take set" }; applyEnvironment(); } // live backdrop change, captured mid-take
+    if (i === 4) { $("#rec-size").value = "portrait"; $("#rec-size").dispatchEvent(new Event("change")); } // live framing switch, rooms.xyz-style
   }
   await new Promise((r) => setTimeout(r, 60));
   const vid = stopRecording();
   results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
   const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
   results.push("path moved across the take: " + moved);
-  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1350) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ", final framing)");
   const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
   results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
   results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  const sizeDeltas = vid ? vid.path.filter((f) => f.size).length : 0;
+  const lastSize = vid ? videoSizeAt(vid, vid.path.length - 1) : null;
+  results.push("framing switch captured mid-take: " + (sizeDeltas >= 2) + " (" + sizeDeltas + " size delta frames, opening square -> portrait)");
+  results.push("framing carried to the last frame: " + (lastSize && lastSize.key === "portrait" && lastSize.width === 1080 && lastSize.height === 1350));
   const envDeltas = vid ? vid.path.filter((f) => f.environment).length : 0;
   results.push("backdrop change captured mid-take: " + (envDeltas >= 1) + " (" + envDeltas + " delta frames)");
   // the record is deltas: the value in effect at the last frame is the

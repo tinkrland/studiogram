@@ -3177,8 +3177,11 @@ async function exportCaptureSet() {
 // (quantitative values only, the same record discipline as photos); the
 // mediarecorder take is an ephemeral preview that never enters scene state.
 // the recording's dimensions are chosen up front (viewport or a platform
-// aspect); every export re-renders the record through webcodecs into mp4,
-// mov, or webm, so the same record exports to the same bytes forever.
+// aspect) and may be switched mid-take, rooms.xyz-style: the operator
+// changes the framing while it runs, each change is captured per frame,
+// and export letterboxes every segment onto the union canvas. every export
+// re-renders the record through webcodecs into mp4, mov, or webm, so the
+// same record exports to the same bytes forever.
 // the dimension presets are shared with photo export: EXPORT_SIZES in
 // socmed-integration/95-captures.js, which loads first
 const VIDEO_FPS = 30;
@@ -3224,6 +3227,7 @@ function startRecording() {
   } catch (e) { /* no mediarecorder: the path is still recorded, exports still work */ }
   let lastLighting = canonical(S.lighting);
   let lastEnvironment = canonical(S.environment);
+  let lastSizeKey = null;
   const sample = () => {
     if (!REC) return;
     const frame = {
@@ -3246,6 +3250,12 @@ function startRecording() {
       lastEnvironment = nowEnv;
       frame.environment = JSON.parse(JSON.stringify(S.environment));
     }
+    // the viewport size travels with the frame: the first sample seeds the
+    // take's opening framing, later entries record each mid-take switch
+    if (REC.sizeKey !== lastSizeKey) {
+      lastSizeKey = REC.sizeKey;
+      frame.size = { key: REC.sizeKey, width: REC.width, height: REC.height };
+    }
     REC.samples.push(frame);
     if (performance.now() - REC.t0 >= VIDEO_MAX_MS) { stopRecording(); return; }
     REC.raf = requestAnimationFrame(sample);
@@ -3257,8 +3267,7 @@ function startRecording() {
   }, 100);
   updateRecordUi(VIDEO_MAX_MS);
   showRecFrameOverlay();
-  $("#rec-size").disabled = true;
-  toast("recording the live viewport. zoom, pan, orbit, lighting, and backdrop changes are all captured.");
+  toast("recording the live viewport. zoom, pan, orbit, lighting, backdrop, and framing changes are all captured.");
   return true;
 }
 
@@ -3289,6 +3298,18 @@ function showRecFrameOverlay() {
   ov.style.height = h + "px";
 }
 $("#photo-size").addEventListener("change", showRecFrameOverlay);
+// rooms.xyz lets the operator change the recording's dimensions while it
+// runs. the switch is live immediately and the next sampled frame carries
+// it, so the export replays the framing exactly as it was played.
+$("#rec-size").addEventListener("change", () => {
+  if (!REC) return;
+  const dims = chosenDims("#rec-size");
+  REC.sizeKey = $("#rec-size").value || "viewport";
+  REC.width = dims.width;
+  REC.height = dims.height;
+  showRecFrameOverlay();
+  toast(`recording framing switched to ${REC.width}x${REC.height}.`);
+});
 
 // resample the live samples onto the fixed export grid: one path entry per
 // exported frame, camera values lerped between the bracketing live samples,
@@ -3299,16 +3320,28 @@ function buildPath(samples, duration_ms) {
   const lerp = (a, b, f) => round(a + (b - a) * f);
   // the lighting value in effect at each live sample, carried forward from
   // the last change at or before it
-  let eff = null, effEnv = null;
+  let eff = null, effEnv = null, effSize = null;
   const effAt = samples.map((s) => { if (s.lighting) eff = s.lighting; return eff; });
   const effEnvAt = samples.map((s) => { if (s.environment) effEnv = s.environment; return effEnv; });
-  const lastJson = () => (path.length ? canonical(path[path.length - 1].lighting || path[path.length - 1]) : null);
+  const effSizeAt = samples.map((s) => { if (s.size) effSize = s.size; return effSize; });
+  // dedupe against the last value each track stored, not against the
+  // previous entry (which may have stored nothing and would re-store
+  // every other frame)
+  let lastLight = null, lastEnv = null, lastSize = null;
   for (let i = 0; i < n; i++) {
     const t = (i / (n - 1)) * duration_ms;
-    let a = samples[0], b = samples[samples.length - 1];
+    // bracket the moment between two live samples; before the first and
+    // after the last sample, clamp to the end brackets. falling back to
+    // the opening sample for the final frame would revert the last frame
+    // to the take's opening lighting, backdrop, and framing.
+    let a = samples[0], b = samples[Math.min(1, samples.length - 1)];
     let ai = 0;
-    for (let j = 0; j < samples.length - 1; j++) {
-      if (samples[j].t <= t && samples[j + 1].t >= t) { a = samples[j]; b = samples[j + 1]; ai = j; break; }
+    if (t >= samples[samples.length - 1].t && samples.length >= 2) {
+      a = samples[samples.length - 2]; b = samples[samples.length - 1]; ai = samples.length - 2;
+    } else {
+      for (let j = 0; j < samples.length - 1; j++) {
+        if (samples[j].t <= t && samples[j + 1].t >= t) { a = samples[j]; b = samples[j + 1]; ai = j; break; }
+      }
     }
     const lighting = effAt[ai];
     const span = Math.max(b.t - a.t, 1e-6);
@@ -3318,19 +3351,33 @@ function buildPath(samples, duration_ms) {
       target: a.target.map((v, k) => lerp(v, b.target[k], f)),
       fov: lerp(a.fov, b.fov, f),
     };
-    // store the lighting only on the frames where it changed
-    if (lighting && canonical(lighting) !== lastJson()) {
+    // store each track only on the frames where its value changed
+    if (lighting && canonical(lighting) !== lastLight) {
+      lastLight = canonical(lighting);
       entry.lighting = JSON.parse(JSON.stringify(lighting));
     }
-    // same for the backdrop: the environment in effect at this moment,
-    // stored only on the export-grid frames where it changed
     const environment = effEnvAt[ai];
-    if (environment && (!path.length || !path[path.length - 1].environment || canonical(path[path.length - 1].environment) !== canonical(environment))) {
+    if (environment && canonical(environment) !== lastEnv) {
+      lastEnv = canonical(environment);
       entry.environment = JSON.parse(JSON.stringify(environment));
+    }
+    const size = effSizeAt[ai];
+    if (size && canonical(size) !== lastSize) {
+      lastSize = canonical(size);
+      entry.size = JSON.parse(JSON.stringify(size));
     }
     path.push(entry);
   }
   return path;
+}
+
+// the viewport size in effect at a path frame, carried forward from the
+// last change at or before it. records from before mid-take switching carry
+// no size entries; they render whole at the record's own dimensions.
+function videoSizeAt(rec, i) {
+  let size = { key: rec.size, width: rec.width, height: rec.height };
+  for (let j = 0; j <= i && j < rec.path.length; j++) if (rec.path[j].size) size = rec.path[j].size;
+  return size;
 }
 
 // the effective lighting at a path frame, carried forward from the last
@@ -3359,7 +3406,7 @@ function stopRecording() {
     duration_ms: Math.round(duration_ms),
     fps: VIDEO_FPS,
     size: closing.sizeKey,
-    width: closing.width,   // the recording's chosen dimensions; export renders at exactly these
+    width: closing.width,   // the final dimensions of the take; earlier segments live in the path
     height: closing.height,
     state_hash: closing.state_hash,
     snapshot: closing.snapshot,
@@ -3406,17 +3453,35 @@ async function renderVideoBuffer(rec, fmt) {
   try {
     await applyCoreState(rec.snapshot);
     renderer.setPixelRatio(1);
-    renderer.setSize(rec.width, rec.height, false);
-    camera.aspect = rec.width / rec.height;
-    pinnedHelper.aspect = rec.width / rec.height;
+    // a video track has one fixed size, so mixed framings export onto the
+    // union of every size the take used: each frame renders at exactly the
+    // dimensions in effect, then centers onto the union canvas (letterbox
+    // bars where aspects differ, black as video convention). takes that
+    // never switched framing export unchanged.
+    const sizes = rec.path.map((_, i) => videoSizeAt(rec, i));
+    const outW = Math.max(...sizes.map((x) => x.width));
+    const outH = Math.max(...sizes.map((x) => x.height));
+    const comp = document.createElement("canvas");
+    comp.width = outW; comp.height = outH;
+    const cctx = comp.getContext("2d");
+    const first = sizes[0];
+    renderer.setSize(first.width, first.height, false);
+    camera.aspect = first.width / first.height;
+    pinnedHelper.aspect = first.width / first.height;
     const target = new BufferTarget();
     const output = new Output({ format: new formats[fmt](), target });
-    const source = new CanvasSource(renderer.domElement, { codec, quality: QUALITY_HIGH });
+    const source = new CanvasSource(comp, { codec, quality: QUALITY_HIGH });
     output.addVideoTrack(source, { frameRate: VIDEO_FPS });
     await output.start();
     const dt = 1 / VIDEO_FPS;
     for (let i = 0; i < rec.path.length; i++) {
       const k = rec.path[i];
+      const size = sizes[i];
+      if (renderer.domElement.width !== size.width || renderer.domElement.height !== size.height) {
+        renderer.setSize(size.width, size.height, false);
+        camera.aspect = size.width / size.height;
+        pinnedHelper.aspect = size.width / size.height;
+      }
       camera.position.set(...k.position);
       controls.target.set(...k.target);
       camera.lookAt(...k.target);
@@ -3427,6 +3492,9 @@ async function renderVideoBuffer(rec, fmt) {
       // and so is a set change: the backdrop is re-rendered as the take played it
       if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
       renderFrame();
+      cctx.fillStyle = "#000";
+      cctx.fillRect(0, 0, outW, outH);
+      cctx.drawImage(renderer.domElement, Math.round((outW - size.width) / 2), Math.round((outH - size.height) / 2));
       await source.add(i * dt, dt);
     }
     await output.finalize();
@@ -3485,6 +3553,13 @@ async function replayVideo(rec) {
         const t = performance.now() - t0;
         const i = Math.min(Math.floor((t / 1000) * VIDEO_FPS), rec.path.length - 1);
         const k = rec.path[i];
+        const size = videoSizeAt(rec, i);
+        if (renderer.domElement.width !== size.width || renderer.domElement.height !== size.height) {
+          renderer.setPixelRatio(1);
+          renderer.setSize(size.width, size.height, false);
+          camera.aspect = size.width / size.height;
+          pinnedHelper.aspect = size.width / size.height;
+        }
         camera.position.set(...k.position);
         controls.target.set(...k.target);
         camera.lookAt(...k.target);
@@ -3890,16 +3965,21 @@ async function runSelfTest() {
     await new Promise((r) => setTimeout(r, 50));
     if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
     if (i === 3) { prevEnv = S.environment; S.environment = { bg: "#304a5e", center: "#4a6a86", preset: "mid-take set" }; applyEnvironment(); } // live backdrop change, captured mid-take
+    if (i === 4) { $("#rec-size").value = "portrait"; $("#rec-size").dispatchEvent(new Event("change")); } // live framing switch, rooms.xyz-style
   }
   await new Promise((r) => setTimeout(r, 60));
   const vid = stopRecording();
   results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
   const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
   results.push("path moved across the take: " + moved);
-  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1350) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ", final framing)");
   const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
   results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
   results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  const sizeDeltas = vid ? vid.path.filter((f) => f.size).length : 0;
+  const lastSize = vid ? videoSizeAt(vid, vid.path.length - 1) : null;
+  results.push("framing switch captured mid-take: " + (sizeDeltas >= 2) + " (" + sizeDeltas + " size delta frames, opening square -> portrait)");
+  results.push("framing carried to the last frame: " + (lastSize && lastSize.key === "portrait" && lastSize.width === 1080 && lastSize.height === 1350));
   const envDeltas = vid ? vid.path.filter((f) => f.environment).length : 0;
   results.push("backdrop change captured mid-take: " + (envDeltas >= 1) + " (" + envDeltas + " delta frames)");
   // the record is deltas: the value in effect at the last frame is the
@@ -4042,16 +4122,21 @@ async function runSceneAudit() {
     await new Promise((r) => setTimeout(r, 50));
     if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
     if (i === 3) { prevEnv = S.environment; S.environment = { bg: "#304a5e", center: "#4a6a86", preset: "mid-take set" }; applyEnvironment(); } // live backdrop change, captured mid-take
+    if (i === 4) { $("#rec-size").value = "portrait"; $("#rec-size").dispatchEvent(new Event("change")); } // live framing switch, rooms.xyz-style
   }
   await new Promise((r) => setTimeout(r, 60));
   const vid = stopRecording();
   results.push("record created: " + (vid ? vid.name + " " + (vid.duration_ms / 1000).toFixed(1) + "s " + vid.path.length + " frames" : "none"));
   const moved = vid && vid.path.length > 1 && JSON.stringify(vid.path[0]) !== JSON.stringify(vid.path[vid.path.length - 1]);
   results.push("path moved across the take: " + moved);
-  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1080) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ")");
+  results.push("recording dimensions honored: " + (vid && vid.width === 1080 && vid.height === 1350) + " (" + (vid ? vid.width + "x" + vid.height : "none") + ", final framing)");
   const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
   results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
   results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  const sizeDeltas = vid ? vid.path.filter((f) => f.size).length : 0;
+  const lastSize = vid ? videoSizeAt(vid, vid.path.length - 1) : null;
+  results.push("framing switch captured mid-take: " + (sizeDeltas >= 2) + " (" + sizeDeltas + " size delta frames, opening square -> portrait)");
+  results.push("framing carried to the last frame: " + (lastSize && lastSize.key === "portrait" && lastSize.width === 1080 && lastSize.height === 1350));
   const envDeltas = vid ? vid.path.filter((f) => f.environment).length : 0;
   results.push("backdrop change captured mid-take: " + (envDeltas >= 1) + " (" + envDeltas + " delta frames)");
   // the record is deltas: the value in effect at the last frame is the
