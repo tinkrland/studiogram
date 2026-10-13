@@ -2,7 +2,7 @@
 // the app itself is a single deterministic html file uploaded to public storage;
 // this endpoint only sets the correct content type so browsers render it.
 const PAGE_URL =
-  "https://media.base44.com/files/public/6accc46c95021cc17a0bd7da/602295c76_index.html";
+  "https://base44.app/api/apps/6ac24e708f39fb029bbbac66/files/mp/public/6ac24e708f39fb029bbbac66/7bca8bd48_index.html";
 
 Deno.serve(async (req) => {
   const upstream = await fetch(PAGE_URL, { cache: "no-store" });

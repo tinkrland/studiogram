@@ -33,21 +33,24 @@ function composeCaption(titles, pdpUrl) {
 
 // the publish payload children: one per photo in set order, each with
 // its uploaded image url and its verified product bindings (the same
-// join the commerce card uses; failed gates never bind).
+// join the commerce card uses; failed gates never bind). products carry
+// the staged pin positions when the tag stage placed them, so the
+// audit record and the handoff know where each tag belongs.
 function publishChildren(photos, urls) {
   return photos.map((photo, i) => ({
     url: urls[i],
     alt: altText(photo, photoProducts(photo)),
-    products: photoProducts(photo).map((p) => ({ sku: p.sku, title: p.title, pdp_url: p.pdp_url })),
+    products: taggedProducts(photo),
   }));
 }
 
 // what to tag in the instagram app, per carousel position. the api
-// cannot set shopping tags, so this list is the honest handoff.
+// cannot set shopping tags, so this list is the honest handoff: the
+// sku plus the staged position when the tag stage placed one.
 function tagSummary(children) {
   return children.map((c, i) => ({
     position: i + 1,
-    products: (c.products || []).map((p) => p.sku),
+    products: (c.products || []).map((p) => p.sku + (p.x != null ? ` @ ${p.x}%, ${p.y}%` : "")),
   }));
 }
 
@@ -158,6 +161,10 @@ function renderPublishBar() {
   connBtn.title = "oauth the instagram account through the backend (the token stays in this tab)";
   connBtn.addEventListener("click", connectInstagram);
   bar.appendChild(connBtn);
+  const stageBtn = el("button", "btn mini", "stage tags");
+  stageBtn.title = "drag the product pins onto the photos; the positions follow the publish as the in-app tagging guide";
+  stageBtn.addEventListener("click", openTagStage);
+  bar.appendChild(stageBtn);
   const pubBtn = el("button", "btn mini", "post set to instagram");
   pubBtn.title = "publish the active set as a carousel; the listing bindings follow as the in-app tag list";
   pubBtn.addEventListener("click", publishSetToInstagram);
@@ -168,6 +175,10 @@ function renderPublishBar() {
       PUBLISH_RESULT.tags.map((t) => t.position + " " + (t.products.length ? t.products.join(", ") : "none")).join(" | "));
     res.style.alignSelf = "center"; res.style.overflowWrap = "anywhere";
     bar.appendChild(res);
+    const refBtn = el("button", "btn mini", "tag reference");
+    refBtn.title = "download the sheet with the staged pins drawn on the frames, the mirror guide for the app pass";
+    refBtn.addEventListener("click", downloadTagReference);
+    bar.appendChild(refBtn);
   }
   strip.appendChild(bar);
 }

@@ -8,7 +8,10 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const source = readFileSync(join(root, "socmed-integration/98-publish.js"), "utf8");
+// the publish module plus the tag stage it reads (taggedProducts lives
+// in the stage module; the build concatenates both in this order)
+const source = readFileSync(join(root, "socmed-integration/98-publish.js"), "utf8") +
+  "\n" + readFileSync(join(root, "socmed-integration/98b-tag-stage.js"), "utf8");
 const fails = [];
 const check = (name, ok, detail = "") => {
   console.log((ok ? "PASS " : "FAIL ") + name + (detail ? " — " + detail : ""));
@@ -27,6 +30,8 @@ const listings = [
 ];
 const sandbox = {
   sessionStorage: (() => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) }; })(),
+  localStorage: (() => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) }; })(),
+  slug: (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
   window: { addEventListener() {}, open() {} },
   fetch: () => { throw new Error("no network in qa"); },
   toast: () => {},
@@ -43,8 +48,8 @@ const sandbox = {
   renderCaptureStrip: () => {},
 };
 const api = vm.runInNewContext(
-  source + "\n;({ composeCaption, publishChildren, tagSummary, igConn, igConnSave })",
-  sandbox, { filename: "98-publish.js" }
+  source + "\n;({ composeCaption, publishChildren, tagSummary, igConn, igConnSave, taggedProducts, stageSetPins, stagePinsFor })",
+  sandbox, { filename: "98-publish.js+98b-tag-stage.js" }
 );
 
 // caption composition: lowercase join, first pdp, 2200 cap, empty case
@@ -76,6 +81,19 @@ const tags = api.tagSummary(children);
 check("tag list is per carousel position",
   JSON.stringify(tags) === JSON.stringify([{ position: 1, products: ["KIR-R02"] }, { position: 2, products: ["KIR-B01", "KIR-R02"] }, { position: 3, products: [] }]),
   JSON.stringify(tags));
+
+// the tag stage: staged pins follow the publish children and the handoff
+api.stageSetPins(photos[0], [{ sku: "KIR-R02", x: 31, y: 67 }]);
+api.stageSetPins(photos[1], [{ sku: "KIR-B01", x: 50, y: 50 }]);
+const staged = api.publishChildren(photos, ["u1", "u2", "u3"]);
+check("staged pin positions ride the matched product row",
+  staged[0].products[0].x === 31 && staged[0].products[0].y === 67, JSON.stringify(staged[0].products));
+check("a pinless binding keeps no position keys",
+  staged[1].products[1].x === undefined && staged[1].products[1].y === undefined, JSON.stringify(staged[1].products));
+const stagedTags = api.tagSummary(staged);
+check("the handoff reads sku at position",
+  stagedTags[0].products[0] === "KIR-R02 @ 31%, 67%" && stagedTags[2].products.length === 0,
+  JSON.stringify(stagedTags));
 
 // the connection lives in sessionStorage only, never in scene state
 api.igConnSave({ access_token: "tok", ig_id: "1", username: "studio" });

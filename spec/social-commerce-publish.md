@@ -31,6 +31,29 @@ platform-generic so pinterest and others can slot in.
   the alternative route - catalog-based ads with product tags - is
   the marketing api, deliberately out of scope here
 
+## the tag stage (2026-10-13, after the owner's ruling)
+
+the api cannot set shopping tags, but it can carry everything else, so
+the human pass gets a planning surface instead of a decision at publish
+time. `98b-tag-stage.js` renders each photo of the set with draggable
+pins over its bound products (one per listing, several for multi-product
+shots), the caption previews exactly as composed, and the reference
+sheet exports as one jpeg with the numbered pins drawn on the frames
+plus the sku legend. the rules it keeps:
+
+- **pins are staging, not authored commerce values.** the sku comes
+  from the verified listing join; only x/y (percentages of the frame,
+  clamped 2 to 98) is user-placed, stored per set in
+  `localStorage["studiogram_tag_stage"]`. a pin can never bind a
+  product the join did not verify, and an orphan pin is ignored
+- **positions ride the publish.** the children products carry x/y when
+  staged, so `studioPublishCarousel` records them in
+  `StudioPublishedSet.products_json` for audit and the post-publish
+  handoff reads "sku at x%, y%" per carousel position
+- **the reference sheet is the mirror guide.** one jpeg, photos in
+  carousel order with position badges, pins drawn and numbered, legend
+  under each frame; the in-app pass copies it instead of re-deciding
+
 ## the architecture (decoupled, same rules as the feed layer)
 
 ```
