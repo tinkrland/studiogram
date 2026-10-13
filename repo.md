@@ -53,6 +53,7 @@ setdesign/            scene composition
 socmed-integration/   creator outputs
   95-captures.js        capture set: frame, reproduce, strip, png export
   96-commerce.js        listing manifest import, commerce card, catalog feeds
+  api/                  per-platform product-api contracts (verified 2026-10-13)
   platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
   platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
 

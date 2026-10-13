@@ -100,12 +100,14 @@ check("card exposes the hash binding", card.photos[0].products[0].mesh_sha256 ==
 const g1 = api.feedCSV("google"), g2 = api.feedCSV("google");
 check("google feed byte-equal across builds", g1 === g2);
 check("google feed rows sorted by sku", g1.indexOf("KIR-B01") < g1.indexOf("KIR-R02"));
-check("google mto rules present", g1.includes("identifier_exists") && g1.includes("FALSE") &&
-  /KIR-R02,.*h-ring-02|,21,1/.test(g1.split("\n").find((l) => l.startsWith("KIR-R02")) || ""),
+check("google mto rules present", g1.includes("identifier_exists") && g1.includes("false") &&
+  /,21,1$/.test(g1.split("\n").find((l) => l.startsWith("KIR-R02")) || ""),
   g1.split("\n").find((l) => l.startsWith("KIR-R02")));
 check("google mpn is the release id", g1.includes(",rel-ring-02,"));
-const meta = api.feedCSV("meta");
-check("meta feed price carries currency", meta.includes("300.00 USD"));
+check("google brand column present after the 2026-10-13 api verify", g1.split("\n")[0].includes("brand"));
+const metaFeed = api.feedCSV("meta");
+check("meta feed carries required brand column", metaFeed.split("\n")[0].split(",").pop() === "brand");
+check("meta feed price carries currency", metaFeed.includes("300.00 USD"));
 const tt = api.feedCSV("tiktok");
 check("tiktok feed availability mapping", tt.includes("IN_STOCK"));
 check("unknown platform refused", api.feedCSV("nope") === null);

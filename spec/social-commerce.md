@@ -46,6 +46,7 @@ reference design releases by id. version 1:
       "currency": "USD",      // default usd
       "pdp_url": "https://...",        // the link-out conversion surface
       "image_url": "https://...",      // optional: hosted catalog image
+      "brand": "...",                  // optional: required by meta and pinterest
       "max_handling_days": 30 // optional, default 30: the mto ship-by window
     }
   ]
@@ -102,9 +103,17 @@ established:
 - **tiktok**: the seller-center facing mapping; `availability`
   `IN_STOCK`, handling days carried per row
 
-v1 column sets are honest approximations: verify against each
-platform's current feed template before first upload (see the research
-branch dossiers for the 2026-10-13 state of each platform).
+the column sets were verified against the platforms' 2026-10-13
+product-api references (see [../socmed-integration/api/](../socmed-integration/api/))
+and corrected in that pass: `identifier_exists` emits lowercase `false`
+(google documents yes/true/no/false for text data sources),
+`brand` is emitted by the google, meta, and tiktok builders (meta and
+pinterest expect it), and the platform-side api target for google is
+the merchant api (content api for shopping was sunset 2026-08-18; the
+csv data-source path is unchanged). the min/max handling columns
+remain flagged: verify against the current google product data spec
+before first upload, with account-level shipping settings as the
+fallback.
 
 `image_link` carries the manifest's hosted `image_url` when present;
 otherwise it is empty and the platform fills it after uploading the

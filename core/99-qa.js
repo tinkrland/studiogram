@@ -164,7 +164,7 @@ async function runSelfTest() {
   results.push("card carries product + composed alt text: " + JSON.stringify(card.photos.find((x) => x.name === cphoto.name).products[0].sku) + " · " + card.photos.find((x) => x.name === cphoto.name).alt);
   const g1 = feedCSV("google"), g2 = feedCSV("google");
   results.push("google feed deterministic: " + (g1 === g2) + ", listing rows: " + (g1.trim().split("\n").length - 1));
-  results.push("google feed mpn is the release id: " + g1.includes(rel0.release_id) + ", identifier_exists FALSE: " + g1.includes("FALSE") + ", quantity override: " + /,1$/.test(g1.trim().split("\n").pop()));
+  results.push("google feed mpn is the release id: " + g1.includes(rel0.release_id) + ", identifier_exists false: " + g1.includes("false") + ", quantity override: " + /,1$/.test(g1.trim().split("\n").pop()));
   const drift = await importListingManifest({ schema: "sculptura-listing-manifest", manifest_version: 1,
     listings: [{ release_id: rel0.release_id, version: rel0.version, mesh_sha256: "deadbeef", sku: "DRIFT", title: "t", price: 1, pdp_url: "u" }] });
   results.push("drifted listing (wrong mesh hash) refused: " + (drift.accepted === 0 && drift.refused.length === 1));

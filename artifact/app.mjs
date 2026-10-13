@@ -2907,7 +2907,7 @@ async function importListingManifest(parsed) {
       release_id: row.release_id, version: row.version, mesh_sha256: row.mesh_sha256,
       sku: row.sku, title: row.title, description: row.description || "",
       price: row.price, currency: row.currency || "USD", pdp_url: row.pdp_url,
-      image_url: row.image_url || "", max_handling_days: row.max_handling_days || 30,
+      image_url: row.image_url || "", brand: row.brand || "", max_handling_days: row.max_handling_days || 30,
     });
   }
   LISTINGS = accepted.sort((a, b) => (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
@@ -2974,25 +2974,25 @@ function feedCSV(platform, listings) {
   const rows = (listings || LISTINGS).slice().sort((a, b) => (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
   let head, cell;
   if (platform === "google") {
-    head = ["id", "title", "description", "link", "image_link", "availability", "price", "condition", "identifier_exists", "mpn", "min_handling_time", "max_handling_time", "quantity"];
+    head = ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists", "mpn", "min_handling_time", "max_handling_time", "quantity"];
     cell = (r, c) => ({
       id: r.sku, title: r.title, description: r.description, link: r.pdp_url,
       image_link: r.image_url, availability: "in_stock", price: r.price.toFixed(2) + " " + r.currency,
-      condition: "new", identifier_exists: "FALSE", mpn: r.release_id,
+      brand: r.brand, condition: "new", identifier_exists: "false", mpn: r.release_id,
       min_handling_time: 7, max_handling_time: r.max_handling_days, quantity: 1,
     }[c]);
   } else if (platform === "meta") {
-    head = ["id", "title", "description", "availability", "condition", "price", "link", "image_link"];
+    head = ["id", "title", "description", "availability", "condition", "price", "link", "image_link", "brand"];
     cell = (r, c) => ({
       id: r.sku, title: r.title, description: r.description, availability: "in stock",
       condition: "new", price: r.price.toFixed(2) + " " + r.currency, link: r.pdp_url,
-      image_link: r.image_url,
+      image_link: r.image_url, brand: r.brand,
     }[c]);
   } else if (platform === "tiktok") {
-    head = ["id", "title", "description", "price", "currency", "availability", "pdp_url", "image_url", "handling_time_days"];
+    head = ["id", "title", "description", "price", "currency", "availability", "brand", "pdp_url", "image_url", "handling_time_days"];
     cell = (r, c) => ({
       id: r.sku, title: r.title, description: r.description, price: r.price.toFixed(2),
-      currency: r.currency, availability: "IN_STOCK", pdp_url: r.pdp_url,
+      currency: r.currency, availability: "IN_STOCK", brand: r.brand, pdp_url: r.pdp_url,
       image_url: r.image_url, handling_time_days: r.max_handling_days,
     }[c]);
   } else {
@@ -3731,7 +3731,7 @@ async function runSelfTest() {
   results.push("card carries product + composed alt text: " + JSON.stringify(card.photos.find((x) => x.name === cphoto.name).products[0].sku) + " · " + card.photos.find((x) => x.name === cphoto.name).alt);
   const g1 = feedCSV("google"), g2 = feedCSV("google");
   results.push("google feed deterministic: " + (g1 === g2) + ", listing rows: " + (g1.trim().split("\n").length - 1));
-  results.push("google feed mpn is the release id: " + g1.includes(rel0.release_id) + ", identifier_exists FALSE: " + g1.includes("FALSE") + ", quantity override: " + /,1$/.test(g1.trim().split("\n").pop()));
+  results.push("google feed mpn is the release id: " + g1.includes(rel0.release_id) + ", identifier_exists false: " + g1.includes("false") + ", quantity override: " + /,1$/.test(g1.trim().split("\n").pop()));
   const drift = await importListingManifest({ schema: "sculptura-listing-manifest", manifest_version: 1,
     listings: [{ release_id: rel0.release_id, version: rel0.version, mesh_sha256: "deadbeef", sku: "DRIFT", title: "t", price: 1, pdp_url: "u" }] });
   results.push("drifted listing (wrong mesh hash) refused: " + (drift.accepted === 0 && drift.refused.length === 1));
