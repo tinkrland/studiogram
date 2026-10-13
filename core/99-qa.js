@@ -212,11 +212,13 @@ async function runSelfTest() {
   results.push("record started: " + !!REC);
   const capBlocked = await captureFrame();
   results.push("photo capture blocked during take: " + (capBlocked === null));
+  let prevEnv = null;
   // a scripted move: the camera sweeps in while the take runs, as zoom would
   for (let i = 1; i <= 5; i++) {
     camera.position.set(140 + i * 6, 260 + i * 3, 460 - i * 24);
     await new Promise((r) => setTimeout(r, 50));
     if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
+    if (i === 3) { prevEnv = S.environment; S.environment = { bg: "#304a5e", center: "#4a6a86", preset: "mid-take set" }; applyEnvironment(); } // live backdrop change, captured mid-take
   }
   await new Promise((r) => setTimeout(r, 60));
   const vid = stopRecording();
@@ -227,6 +229,14 @@ async function runSelfTest() {
   const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
   results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
   results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  const envDeltas = vid ? vid.path.filter((f) => f.environment).length : 0;
+  results.push("backdrop change captured mid-take: " + (envDeltas >= 1) + " (" + envDeltas + " delta frames)");
+  // the record is deltas: the value in effect at the last frame is the
+  // last change at or before it, same carry-forward the export applies
+  const envAt = (rec, i) => { let e = rec.snapshot.environment; for (let j = 0; j <= i && j < rec.path.length; j++) if (rec.path[j].environment) e = rec.path[j].environment; return e; };
+  const lastEnv = vid ? envAt(vid, vid.path.length - 1) : null;
+  results.push("backdrop carried to the last frame: " + (lastEnv && lastEnv.preset === "mid-take set" && lastEnv.bg === "#304a5e"));
+  if (prevEnv) { S.environment = JSON.parse(JSON.stringify(prevEnv)); applyEnvironment(); prevEnv = null; } // the take keeps its record; the session returns to its set
   results.push("record serialized in state: " + (serializeState(false).recordings.length === 1));
   const bufEq = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every((v, i) => v === new Uint8Array(b)[i]);
   const brand = (b) => new TextDecoder().decode(new Uint8Array(b.slice(4, 10)));
@@ -354,11 +364,13 @@ async function runSceneAudit() {
   results.push("record started: " + !!REC);
   const capBlocked = await captureFrame();
   results.push("photo capture blocked during take: " + (capBlocked === null));
+  let prevEnv = null;
   // a scripted move: the camera sweeps in while the take runs, as zoom would
   for (let i = 1; i <= 5; i++) {
     camera.position.set(140 + i * 6, 260 + i * 3, 460 - i * 24);
     await new Promise((r) => setTimeout(r, 50));
     if (i === 2) { S.lighting.key.intensity = 3.7; applyLighting(); } // live lighting change, captured mid-take
+    if (i === 3) { prevEnv = S.environment; S.environment = { bg: "#304a5e", center: "#4a6a86", preset: "mid-take set" }; applyEnvironment(); } // live backdrop change, captured mid-take
   }
   await new Promise((r) => setTimeout(r, 60));
   const vid = stopRecording();
@@ -369,6 +381,14 @@ async function runSceneAudit() {
   const deltas = vid ? vid.path.filter((f) => f.lighting).length : 0;
   results.push("lighting change captured mid-take: " + (deltas >= 1) + " (" + deltas + " delta frames)");
   results.push("lighting carried to the last frame: " + (vid && pathLightingAt(vid, vid.path.length - 1).key.intensity === 3.7));
+  const envDeltas = vid ? vid.path.filter((f) => f.environment).length : 0;
+  results.push("backdrop change captured mid-take: " + (envDeltas >= 1) + " (" + envDeltas + " delta frames)");
+  // the record is deltas: the value in effect at the last frame is the
+  // last change at or before it, same carry-forward the export applies
+  const envAt = (rec, i) => { let e = rec.snapshot.environment; for (let j = 0; j <= i && j < rec.path.length; j++) if (rec.path[j].environment) e = rec.path[j].environment; return e; };
+  const lastEnv = vid ? envAt(vid, vid.path.length - 1) : null;
+  results.push("backdrop carried to the last frame: " + (lastEnv && lastEnv.preset === "mid-take set" && lastEnv.bg === "#304a5e"));
+  if (prevEnv) { S.environment = JSON.parse(JSON.stringify(prevEnv)); applyEnvironment(); prevEnv = null; } // the take keeps its record; the session returns to its set
   results.push("record serialized in state: " + (serializeState(false).recordings.length === 1));
   const bufEq = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every((v, i) => v === new Uint8Array(b)[i]);
   const brand = (b) => new TextDecoder().decode(new Uint8Array(b.slice(4, 10)));

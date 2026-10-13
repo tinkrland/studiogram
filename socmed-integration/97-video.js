@@ -1,7 +1,7 @@
 // ===== video recording: manually driven viewport capture =====
 // the owner ruled on movement after seeing the reference platform: recording
 // captures the manually driven viewport, not an orbit script. zoom in, zoom
-// out, pan, orbit, and live lighting adjustments all stay active during a
+// out, pan, orbit, live lighting, and backdrop set changes all stay active during a
 // take, and all of it is captured per frame. the take's durable truth is the
 // per-frame camera path plus lighting deltas plus the take-time snapshot
 // (quantitative values only, the same record discipline as photos); the
@@ -53,6 +53,7 @@ function startRecording() {
     }
   } catch (e) { /* no mediarecorder: the path is still recorded, exports still work */ }
   let lastLighting = canonical(S.lighting);
+  let lastEnvironment = canonical(S.environment);
   const sample = () => {
     if (!REC) return;
     const frame = {
@@ -68,6 +69,13 @@ function startRecording() {
       lastLighting = nowLighting;
       frame.lighting = JSON.parse(JSON.stringify(S.lighting));
     }
+    // the backdrop is captured the same way: only the frames where it
+    // changed carry it, so a set change mid-take survives the export
+    const nowEnv = canonical(S.environment);
+    if (nowEnv !== lastEnvironment) {
+      lastEnvironment = nowEnv;
+      frame.environment = JSON.parse(JSON.stringify(S.environment));
+    }
     REC.samples.push(frame);
     if (performance.now() - REC.t0 >= VIDEO_MAX_MS) { stopRecording(); return; }
     REC.raf = requestAnimationFrame(sample);
@@ -80,7 +88,7 @@ function startRecording() {
   updateRecordUi(VIDEO_MAX_MS);
   showRecFrameOverlay();
   $("#rec-size").disabled = true;
-  toast("recording the live viewport. zoom, pan, orbit, and lighting changes are all captured.");
+  toast("recording the live viewport. zoom, pan, orbit, lighting, and backdrop changes are all captured.");
   return true;
 }
 
@@ -121,8 +129,9 @@ function buildPath(samples, duration_ms) {
   const lerp = (a, b, f) => round(a + (b - a) * f);
   // the lighting value in effect at each live sample, carried forward from
   // the last change at or before it
-  let eff = null;
+  let eff = null, effEnv = null;
   const effAt = samples.map((s) => { if (s.lighting) eff = s.lighting; return eff; });
+  const effEnvAt = samples.map((s) => { if (s.environment) effEnv = s.environment; return effEnv; });
   const lastJson = () => (path.length ? canonical(path[path.length - 1].lighting || path[path.length - 1]) : null);
   for (let i = 0; i < n; i++) {
     const t = (i / (n - 1)) * duration_ms;
@@ -142,6 +151,12 @@ function buildPath(samples, duration_ms) {
     // store the lighting only on the frames where it changed
     if (lighting && canonical(lighting) !== lastJson()) {
       entry.lighting = JSON.parse(JSON.stringify(lighting));
+    }
+    // same for the backdrop: the environment in effect at this moment,
+    // stored only on the export-grid frames where it changed
+    const environment = effEnvAt[ai];
+    if (environment && (!path.length || !path[path.length - 1].environment || canonical(path[path.length - 1].environment) !== canonical(environment))) {
+      entry.environment = JSON.parse(JSON.stringify(environment));
     }
     path.push(entry);
   }
@@ -239,6 +254,8 @@ async function renderVideoBuffer(rec, fmt) {
       camera.updateProjectionMatrix();
       // a lighting change captured mid-take is part of the performance
       if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+      // and so is a set change: the backdrop is re-rendered as the take played it
+      if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
       renderFrame();
       await source.add(i * dt, dt);
     }
@@ -304,6 +321,7 @@ async function replayVideo(rec) {
         camera.fov = k.fov;
         camera.updateProjectionMatrix();
         if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+        if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
         renderFrame();
         if (t >= rec.duration_ms || i >= rec.path.length - 1) return resolve();
         requestAnimationFrame(step);

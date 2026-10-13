@@ -5,7 +5,7 @@ after seeing the reference platform in use): recording is a manually
 driven capture of the live viewport, not an orbit script. on rooms.xyz
 the operator zooms in and out, pans, and changes the dimensions of the
 recording while it runs; a studiogram take captures exactly that, plus
-live lighting adjustments. export modes are mp4, mov, and webm. this
+live lighting and backdrop set adjustments. export modes are mp4, mov, and webm. this
 spec covers the video record, the live take, and deterministic export.
 it builds on `camera/45-camera-modes.js` (orbit vs pinned),
 `socmed-integration/95-captures.js` (capture, snapshot, reproduce,
@@ -15,7 +15,7 @@ export), and the photo record model of [photo-taking.md](photo-taking.md).
 
 a photo's truth is its camera values plus snapshot; a video's truth is
 the same plus time: a per-frame camera path with per-frame lighting
-changes. the recording that ships is re-rendered from the record, never
+and backdrop changes. the recording that ships is re-rendered from the record, never
 the live-compressed take. this keeps the one invariant the studio is
 built on: exports are deterministic renders of recorded state, so the
 same record exports to the same bytes in any of the three formats,
@@ -33,20 +33,24 @@ recording: {
   state_hash,             // sha-256 over the core scene state at the take
   snapshot,               // the full core scene state at the take
   gate: [ ... ],          // gate entries at take time (same as a photo)
-  path: [ { position, target, fov, lighting? }, ... ]  // per-frame, fixed timestep
+  path: [ { position, target, fov, lighting?, environment? }, ... ]  // per-frame, fixed timestep
 }
 ```
 
 - the path is the performance: camera values per frame at the export
   fps, lerped onto the fixed grid from the live samples. a frame carries
   lighting values only when they changed (delta encoding, carried
-  forward at export). all quantitative, which is what scene state is
-  allowed to carry (no blobs, no qualitative data).
+  forward at export). the backdrop set follows the same rule: a frame
+  carries the environment values only when they changed, so a
+  mid-take set swap survives into the export. all quantitative, which
+  is what scene state is allowed to carry (no blobs, no qualitative
+  data).
 - the snapshot and gate follow the photo model exactly: values are
   truth, the gate array records what was verified at take time, and
   reproduce never re-gates. scene edits beyond lighting mid-take are
-  not part of the record; the take starts from the committed state and
-  lighting is the one live exception because the owner called it out.
+  not part of the record; the take starts from the committed state.
+  lighting and the backdrop set are the live exceptions because the
+  owner called them out.
 - `width`/`height` are the recording's chosen dimensions (d3); export
   renders at exactly these.
 - recordings live in a scene-level `recordings: []` array; the field is
