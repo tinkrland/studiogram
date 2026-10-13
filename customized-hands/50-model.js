@@ -80,6 +80,7 @@ async function loadHandModel() {
   }
   computeFingerRadii();
   HAND.loaded = true;
+  applyNails();
   applyFinish();
 }
 // per-finger skin radius at the seat height: eight inward rays cast around

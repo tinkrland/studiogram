@@ -58,9 +58,12 @@ invariants, which this build must keep:
 
 - subject: rigged hand (8970 verts, 33 bones), five pose presets, per-
   finger curl/spread, wrist framing; seven authored blend targets plus
-  presentation presets; surface layer (tone tint, follicle hair, nail
-  polish from extracted nail plates, atlas-painted tattoos); porcelain or
-  skin finish.
+  presentation presets; surface layer (skin tones sampled from the
+  owner's uploaded swatch charts: nine presets, light to deep, each with
+  lightness/warmth/depth adjustments, follicle hair, atlas-painted
+  tattoos); porcelain or skin finish. nails are real geometry: a plate
+  per fingertip, shape picked from a 19-shape library, then a length
+  slider (natural ignores length); polish tints the plate itself.
 - jewelry: release records now carry their compiled mesh (a glb embedded as
   a data-uri plus a sha-256 over the glb bytes). the scene renders the
   compiled mesh through GLTFLoader: what is shown is what is manufactured.

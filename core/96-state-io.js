@@ -37,6 +37,7 @@ async function applyFullState(raw, opts = {}) {
     const b = BACKDROPS[st.environment.backdrop] || BACKDROPS.warm_gray;
     st.environment = { ...b, preset: st.environment.backdrop };
   }
+  if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
   // photos: pull thumbs into memory, keep the rest as values
   for (const c of st.photos || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }

@@ -12,7 +12,7 @@ manifest = [
     "core/40-render.js", "lighting/41-lighting.js", "setdesign/42-backdrops.js",
     "core/43-render-composite.js", "camera/45-camera-modes.js",
     "customized-hands/50-model.js", "customized-hands/52-morphology.js",
-    "customized-hands/54-surface.js", "customized-hands/56-tattoos.js",
+    "customized-hands/53-nails.js", "customized-hands/54-surface.js", "customized-hands/56-tattoos.js",
     "dollification/58-finish.js", "posing-studio/60-posing.js",
     "jewelry/70-jewelry.js",
     "core/80-panel-infra.js", "customized-hands/82-subject-panel.js",
@@ -31,6 +31,8 @@ hair = (root / "customized-hands/hair-region.json").read_text()
 js = js.replace("const HAIR_REGION = /*__HAIRPTS__*/[];", "const HAIR_REGION = " + hair + ";")
 nails = (root / "customized-hands/nail-region.json").read_text()
 js = js.replace("const NAIL_REGION = /*__NAILPTS__*/{};", "const NAIL_REGION = " + nails + ";")
+nailframe = (root / "customized-hands/nail-frame.json").read_text()
+js = js.replace("const NAIL_FRAME = /*__NAILFRAME__*/{};", "const NAIL_FRAME = " + nailframe + ";")
 b64 = base64.b64encode((root / "assets/hand.glb").read_bytes()).decode()
 js = js.replace('"__HANDGLB__"', '"' + b64 + '"')
 # vendor three@0.160.0: the artifact carries the pinned module and its four

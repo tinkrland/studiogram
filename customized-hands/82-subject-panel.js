@@ -27,33 +27,90 @@ function renderSubjectPanel() {
     "the skin layer, independent of morphology: tone tints the base skin texture, body hair is follicle strokes composited on the forearm. available on every presentation preset; visible on the skin finish.");
   const scard = el("div", "card");
   const sk = S.hand.skin;
-  slider(scard, "skin tone", 0, 1, 0.05,
-    () => sk.tone,
-    (v) => { sk.tone = v; },
-    { apply: () => applySurface(), fmt: (v) => v.toFixed(2) });
+  // skin tone: pick a preset first (grouped fair to deep), then adjust it.
+  // a hex field is deliberately not the first option: presets are the
+  // starting point, the three sliders refine them.
+  const swatchBox = el("div", "skin-swatches");
+  const paintSwatches = () => {
+    swatchBox.innerHTML = "";
+    for (const g of SKIN_GROUPS) {
+      const rowEl = el("div", "skin-row");
+      rowEl.appendChild(el("span", "skin-group", g));
+      for (const pr of SKIN_PRESETS.filter((x) => x.group === g)) {
+        const b = el("button", "skin-swatch" + (sk.preset === pr.key ? " sel" : ""));
+        b.style.background = pr.hex;
+        b.title = pr.label + " " + pr.hex;
+        b.setAttribute("aria-label", pr.label);
+        b.addEventListener("click", () => {
+          sk.preset = pr.key;
+          sk.lightness = 0; sk.warmth = 0; sk.depth = 0;   // a fresh preset starts clean
+          applySurface(); saveState(); renderSubjectPanel();
+        });
+        rowEl.appendChild(b);
+      }
+      swatchBox.appendChild(rowEl);
+    }
+  };
+  paintSwatches();
+  scard.appendChild(swatchBox);
+  scard.appendChild(el("div", "hint", `${skinPreset(sk.preset).label} · adjusted ${skinAlbedoHex()}`));
+  const adj = (label, key) => slider(scard, label, -1, 1, 0.05,
+    () => sk[key] || 0, (v) => { sk[key] = v; },
+    { apply: () => applySurface(), fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(2) });
+  adj("lightness", "lightness");
+  adj("warmth", "warmth");
+  adj("depth", "depth");
+  button(scard, "reset to preset", "btn mini", () => { sk.lightness = 0; sk.warmth = 0; sk.depth = 0; applySurface(); saveState(); renderSubjectPanel(); });
   slider(scard, "body hair", 0, 1, 0.05,
     () => sk.hair,
     (v) => { sk.hair = v; },
     { apply: () => applySurface(), fmt: (v) => v.toFixed(2) });
   surface.appendChild(scard);
 
-  // nail appearance: polish tint on the nail plates. surface, not shape —
-  // length and shape stay morph targets on the same base mesh.
+  // nails: a real plate on each finger. pick a shape from the library, then
+  // a length slider appears for it. polish colour tints the plate itself.
+  const nails = section(PANEL, "nails");
+  hint(nails, "pick a nail shape, then set its length. the plate is real geometry on each fingertip, so it follows posing and shows on both the porcelain and skin finishes.");
+  const nl = S.hand.nails;
+  const shapeGrid = el("div", "nail-shapes");
+  for (const key of NAIL_SHAPE_ORDER) {
+    const def = NAIL_SHAPES[key];
+    const b = el("button", "nail-shape" + (nl.shape === key ? " sel" : ""));
+    b.title = def.label;
+    b.setAttribute("aria-label", def.label);
+    b.appendChild(nailShapeIcon(key));
+    b.appendChild(el("span", null, def.label));
+    b.addEventListener("click", () => {
+      nl.shape = key;
+      if (typeof nl.length !== "number") nl.length = 0.4;
+      applyNails(); saveState(); renderSubjectPanel();
+    });
+    shapeGrid.appendChild(b);
+  }
+  nails.appendChild(shapeGrid);
+  if (nl.shape && NAIL_SHAPES[nl.shape]) {
+    const lcard = el("div", "card");
+    slider(lcard, "length", 0, 1, 0.01,
+      () => nl.length,
+      (v) => { nl.length = v; },
+      { apply: () => applyNails(), fmt: (v) => (v * 100).toFixed(0) + "%" });
+    nails.appendChild(lcard);
+  }
   const nailRow = el("div", "row");
-  nailRow.appendChild(el("label", null, "nails"));
+  nailRow.appendChild(el("label", null, "polish"));
   const nailBtns = el("div", "btnrow");
   nailBtns.style.margin = "0";
   for (const key of ["natural", "polished"]) {
-    const b = el("button", "btn mini" + (S.hand.nails?.style === key ? " primary" : ""), key);
-    b.addEventListener("click", () => { S.hand.nails.style = key; applySurface(); renderSubjectPanel(); saveState(); });
+    const b = el("button", "btn mini" + (nl.style === key ? " primary" : ""), key);
+    b.addEventListener("click", () => { nl.style = key; applyNails(); applySurface(); renderSubjectPanel(); saveState(); });
     nailBtns.appendChild(b);
   }
   const ncol = document.createElement("input");
-  ncol.type = "color"; ncol.value = S.hand.nails?.color || "#b23a48"; ncol.style.width = "42px";
-  ncol.addEventListener("input", () => { S.hand.nails.color = ncol.value; applySurface(); saveState(); });
+  ncol.type = "color"; ncol.value = nl.color || "#b23a48"; ncol.style.width = "42px";
+  ncol.addEventListener("input", () => { nl.color = ncol.value; applyNails(); applySurface(); saveState(); });
   nailBtns.appendChild(ncol);
   nailRow.appendChild(nailBtns);
-  surface.appendChild(nailRow);
+  nails.appendChild(nailRow);
 
   const tat = section(PANEL, "tattoos");
   hint(tat, "sleeve-on placement: pick a design, enter place mode, and the ink follows the surface under your cursor. the commit paints into the hand's texture, so it rides posing and morphs instead of sitting on top as geometry. click to commit, esc to leave. visible on the skin finish.");
@@ -120,10 +177,7 @@ function renderSubjectPanel() {
     ["palm proportions", -1, 1, 0.05]
   ];
   const morphKeys = { "finger length": "finger_length", "finger thickness": "finger_thickness", "palm width": "palm_width", "palm proportions": "palm_proportions", "build": "build" };
-  const morphDefs2 = [
-    ["nail length", 0, 1, 0.05, "nail_length"],
-    ["nail shape", 0, 1, 0.05, "nail_shape"]
-  ];
+  const morphDefs2 = [];   // nail length and shape moved to the nails section: a real plate with a shape library
   const mcard = el("div", "card");
   for (const [label, lo, hi, st, kOverride] of morphDefs.map((d) => [d[0], d[1], d[2], d[3], morphKeys[d[0]]]).concat(morphDefs2)) {
     const k = kOverride;
@@ -160,7 +214,7 @@ function renderSubjectPanel() {
     t.appendChild(el("b", null, cfg.name));
     const h = cfg.hand;
     t.appendChild(el("span", null,
-      h.presentation + " · " + h.finish + " · tone " + (h.skin?.tone ?? 0.4).toFixed(2) +
+      h.presentation + " · " + h.finish + " · " + (migrateSkin(h.skin).preset.replace(/_/g, " ")) +
       " · " + (h.tattoos?.length || 0) + ((h.tattoos?.length || 0) === 1 ? " tattoo" : " tattoos")));
     card.appendChild(t);
     const meta = el("div", "meta",

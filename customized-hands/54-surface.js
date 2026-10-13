@@ -11,13 +11,70 @@ const NAIL_REGION = /*__NAILPTS__*/{};
 // one canvas rebuild serves both — the state is the truth, the texture is
 // derived. hair candidates come from the forearm's uv region, so density
 // stays anchored to the surface regardless of morph weights.
-function skinToneColor(t) {
-  // multiply tint from untouched (t=0) to a deep tone (t=1). multiply only
-  // darkens and warms; the base skin texture keeps all its detail.
-  const a = Math.min(1, Math.max(0, t));
-  const c0 = [1.0, 1.0, 1.0];
-  const c1 = [0.52, 0.36, 0.29];
-  return c0.map((v, i) => v + (c1[i] - v) * a);
+// ---- skin tone: presets first, adjustable after ----
+// a preset is a starting albedo, grouped the way the owner's reference
+// sheets group them: fair through deep, each row a different undertone.
+// the creator picks one, then nudges it with lightness / warmth / depth, so
+// a preset is a prefill on the same controls as manual tuning, never a
+// separate rendering path (the same rule as backdrops).
+const SKIN_PRESETS = [
+  // sampled from the owner's uploaded skin-tone reference sheets: the nine
+  // distinct swatch colours those charts carry, ordered light to deep. the
+  // panel shows them by group; the three adjustments stack on top of a pick.
+  { key: "petal",     label: "petal",     group: "light",  hex: "#f1c8b0" },
+  { key: "shell",     label: "shell",     group: "light",  hex: "#e6b89d" },
+  { key: "sand",      label: "sand",      group: "light",  hex: "#dbac88" },
+  { key: "golden",    label: "golden",    group: "medium", hex: "#d49d79" },
+  { key: "tan",       label: "tan",      group: "medium", hex: "#c58a63" },
+  { key: "caramel",   label: "caramel",   group: "medium", hex: "#b37856" },
+  { key: "bronze",    label: "bronze",    group: "deep",   hex: "#9f6c4e" },
+  { key: "chestnut",  label: "chestnut",  group: "deep",   hex: "#8b593f" },
+  { key: "espresso",  label: "espresso",  group: "deep",   hex: "#724932" },
+];
+const SKIN_GROUPS = ["light", "medium", "deep"];
+const skinPreset = (key) => SKIN_PRESETS.find((p) => p.key === key) || SKIN_PRESETS.find((p) => p.key === "golden");
+
+const hexToRgb01 = (hex) => { const h = hex.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255); };
+const srgbToLin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+const linToSrgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(Math.max(0, c), 1 / 2.4) - 0.055);
+
+// the albedo the creator ends up with: preset hex, then three adjustments.
+//   lightness  -1..1  scales luminance in linear light
+//   warmth     -1..1  shifts undertone: warm pushes red/yellow, cool pushes pink/blue
+//   depth      -1..1  saturation: less = muted/greyer, more = richer
+// returns linear rgb. all three default to 0, so a bare preset is the swatch.
+function skinAlbedo() {
+  const sk = S.hand.skin || {};
+  const base = hexToRgb01(skinPreset(sk.preset).hex).map(srgbToLin);
+  const L = sk.lightness || 0, W = sk.warmth || 0, D = sk.depth || 0;
+  let c = base.map((v) => v * Math.pow(2, L * 0.9));
+  const lum = c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+  c = c.map((v) => lum + (v - lum) * (1 + D * 0.7));
+  c = [c[0] * (1 + W * 0.10), c[1] * (1 + W * 0.02), c[2] * (1 - W * 0.14)];
+  return c.map((v) => Math.min(1, Math.max(0, v)));
+}
+// saves that predate presets carry skin.tone (0..1, a multiply tint on the
+// pink-tan texture). map each to the preset whose swatch the old tint
+// rendered closest to, so an old scene keeps its look. the old default
+// (tone 0.4, about #a46d5d) lands on bronze; new scenes open on golden.
+function migrateSkin(sk) {
+  const d = { preset: "golden", lightness: 0, warmth: 0, depth: 0, hair: 0.35 };
+  if (!sk || typeof sk !== "object") return d;
+  if (sk.preset && SKIN_PRESETS.some((p) => p.key === sk.preset)) return { ...d, ...sk, tone: undefined };
+  const t = Math.min(1, Math.max(0, typeof sk.tone === "number" ? sk.tone : 0.4));
+  // old rendered colour = texture mean (0.80,0.57,0.51) * lerp(1, [.52,.36,.29], t)
+  const old = [0.80, 0.57, 0.51].map((v, i) => v * (1 + ([0.52, 0.36, 0.29][i] - 1) * t));
+  let best = null, bd = 1e9;
+  for (const pr of SKIN_PRESETS) {
+    const c = hexToRgb01(pr.hex);
+    const dist = Math.hypot(c[0] - old[0], c[1] - old[1], c[2] - old[2]);
+    if (dist < bd) { bd = dist; best = pr.key; }
+  }
+  return { ...d, preset: best, hair: typeof sk.hair === "number" ? sk.hair : d.hair };
+}
+function skinAlbedoHex() {
+  const c = skinAlbedo().map((v) => Math.round(Math.min(1, Math.max(0, linToSrgb(v))) * 255));
+  return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
 }
 function hexA(hex, a) {
   const h = hex.replace("#", "");
@@ -34,10 +91,11 @@ function mulberry32(seed) {
 }
 function applySurface() {
   if (!HAND.skinMeshes || !HAND.skinMaterials) return;
-  const tone = S.hand.skin?.tone ?? 0.4;
   const hair = S.hand.skin?.hair ?? 0.35;
   HAND.skinMaterials.forEach((mat, i) => {
-    const base = mat.map;
+    // always the pristine glb map: once the skin finish is on, mat.map is the
+    // surface canvas itself, and drawing a canvas onto itself erases it
+    const base = HAND.baseMaps?.get(i) || mat.map;
     if (!base || !base.image) return;
     const size = 1024;
     let cv = HAND.surfaceCanvas?.get(i);
@@ -56,12 +114,26 @@ function applySurface() {
     ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, size, size);
     ctx.drawImage(base.image, 0, 0, size, size);
-    // tone tint, multiply keeps the texture's shading structure
-    if (tone > 0.001) {
-      const c = skinToneColor(tone);
-      ctx.globalCompositeOperation = "multiply";
-      ctx.fillStyle = `rgb(${Math.round(c[0]*255)}, ${Math.round(c[1]*255)}, ${Math.round(c[2]*255)})`;
-      ctx.fillRect(0, 0, size, size);
+    // skin colour: the albedo is the colour, the base texture contributes only
+    // its shading (creases, knuckles, veins) as a soft overlay. building the
+    // colour from the albedo instead of tinting the pink-tan texture is what
+    // lets a pale preset stay pale without clipping and a deep one stay deep.
+    {
+      const a = skinAlbedo().map((v) => Math.round(linToSrgb(v) * 255));
+      const shade = ctx.getImageData(0, 0, size, size);
+      const d = shade.data;
+      const BASE_LUM = 0.338;            // median linear luminance of the hand colour map over the texels the mesh covers
+      const DETAIL = 0.55;               // how much of the texture's shading survives (0 flat, 1 all)
+      for (let q = 0; q < d.length; q += 4) {
+        const lr = srgbToLin(d[q] / 255), lg = srgbToLin(d[q + 1] / 255), lb = srgbToLin(d[q + 2] / 255);
+        const y = lr * 0.2126 + lg * 0.7152 + lb * 0.0722;
+        const rel = 1 + (y / BASE_LUM - 1) * DETAIL;               // 1 = average shading
+        const k = Math.min(1.35, Math.max(0.35, rel));
+        d[q]     = Math.min(255, Math.round(linToSrgb(srgbToLin(a[0] / 255) * k) * 255));
+        d[q + 1] = Math.min(255, Math.round(linToSrgb(srgbToLin(a[1] / 255) * k) * 255));
+        d[q + 2] = Math.min(255, Math.round(linToSrgb(srgbToLin(a[2] / 255) * k) * 255));
+      }
+      ctx.putImageData(shade, 0, 0);
     }
     // body hair: forearm follicle candidates, deterministic per index
     if (hair > 0.001 && Array.isArray(HAIR_REGION) && HAIR_REGION.length) {
@@ -86,33 +158,8 @@ function applySurface() {
         ctx.restore();
       }
     }
-    // nail appearance: polish tints the nail plates. painted into the
-    // composite so it rides posing, morphs, and the finish swap like any
-    // other surface detail — visible on the skin finish.
-    const nails = S.hand.nails;
-    if (nails?.style === "polished" && NAIL_REGION && Object.keys(NAIL_REGION).length) {
-      ctx.globalCompositeOperation = "source-over";
-      const col = nails.color || "#b23a48";
-      // one soft ellipse per nail plate: center, radii and angle come from
-      // the plate points, so the tint stays inside the plate, not on skin.
-      for (const plate of Object.values(NAIL_REGION)) {
-        const [cu, cv] = plate.c;
-        const [ru, rv] = plate.r;
-        ctx.save();
-        ctx.translate(cu * size, cv * size);
-        ctx.rotate(plate.a || 0);
-        ctx.scale(Math.max(ru, 1e-4) * size, Math.max(rv, 1e-4) * size);
-        const g = ctx.createRadialGradient(0, 0, 0.55, 0, 0, 1);
-        g.addColorStop(0, hexA(col, 0.78));
-        g.addColorStop(0.72, hexA(col, 0.55));
-        g.addColorStop(1, hexA(col, 0));
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-    }
+    // nail polish is on the nail plate itself (53-nails.js), not painted into
+    // the skin atlas: a painted ellipse would smudge around the real plate.
     ctx.globalCompositeOperation = "source-over";
     paintTattoos(ctx, size);
     const tex = HAND.surfaceTexture.get(i);

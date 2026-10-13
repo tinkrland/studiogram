@@ -74,7 +74,7 @@ function defaultHand() {
     finish: "porcelain",
     presentation: "hand", // hand | male hand | female hand — blend weights, not files
     morph: { build: 0, finger_length: 0, finger_thickness: 0, palm_width: 0, palm_proportions: 0, nail_length: 0, nail_shape: 0 },
-    skin: { tone: 0.4, hair: 0.35 }, // surface layer: tone tints the texture, hair is drawn follicles on the forearm
+    skin: { preset: "golden", lightness: 0, warmth: 0, depth: 0, hair: 0.35 }, // surface layer: a preset albedo plus three adjustments; hair is drawn follicles on the forearm
     nails: { style: "natural", color: "#b23a48" }, // surface layer: polish tints the nail plates in the atlas
     tattoos: [], // painted into the texture atlas: { id, design, u, v, w, rot } — material, not geometry
     credit: "Rigged Hand by DennisH2010 (blendswap 66039), CC BY-SA 3.0"
@@ -172,7 +172,7 @@ function applySavedHand(cfg) {
   S.hand.presentation = h.presentation || "hand";
   S.hand.morph = h.morph || defaultHand().morph;
   S.hand.finish = h.finish || "porcelain";
-  S.hand.skin = h.skin || defaultHand().skin;
+  S.hand.skin = migrateSkin(h.skin);
   S.hand.nails = h.nails || defaultHand().nails;
   S.hand.tattoos = h.tattoos || [];
   applyFinish(); // routes the surface composite and painted tattoos for the skin finish
