@@ -1,0 +1,10 @@
+{
+  "name": "studiogram",
+  "private": true,
+  "type": "module",
+  "description": "virtual product photography studio - deps are for the offline qa scripts only; the artifact itself has none",
+  "dependencies": {
+    "puppeteer-core": "^24.0.0",
+    "pngjs": "^7.0.0"
+  }
+}

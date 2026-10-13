@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>studiogram</title>
+<style>
+  :root {
+    --bg: #101114;
+    --panel: #17181c;
+    --panel2: #1d1e23;
+    --line: #26272c;
+    --text: #e8e6e1;
+    --dim: #9a978f;
+    --accent: #c8b47a;
+    --accent2: #8fa5c0;
+    --good: #7fae7f;
+    --bad: #c97f7f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    font-size: 13px; overflow: hidden;
+  }
+  #app { display: grid; grid-template-rows: 46px 1fr 138px; height: 100vh; }
+
+  /* top bar */
+  #topbar {
+    display: flex; align-items: center; gap: 14px; padding: 0 16px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  #wordmark { font-size: 15px; letter-spacing: 0.22em; color: var(--accent); font-weight: 600; }
+  #tagline { color: var(--dim); font-size: 11.5px; }
+  #topbar .spacer { flex: 1; }
+  #gatebadge {
+    font-size: 11px; color: var(--good); border: 1px solid var(--line);
+    border-radius: 3px; padding: 3px 8px; background: var(--panel2);
+  }
+  .btn {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 3px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #17150f; border-color: var(--accent); font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); color: #17150f; }
+  .btn.mini { padding: 2px 6px; font-size: 11px; }
+  .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+
+  /* main split */
+  #main { display: grid; grid-template-columns: 330px 1fr; min-height: 0; }
+
+  /* left panel */
+  #panel {
+    border-right: 1px solid var(--line); background: var(--panel);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  #tabs { display: flex; border-bottom: 1px solid var(--line); }
+  #tabs button {
+    flex: 1; background: none; border: none; color: var(--dim); padding: 9px 0;
+    font-size: 11.5px; letter-spacing: 0.06em; cursor: pointer; font-family: inherit;
+    border-bottom: 2px solid transparent;
+  }
+  #tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  #tabs button:hover { color: var(--text); }
+  #panelbody { overflow-y: auto; padding: 14px 16px 40px; flex: 1; }
+  #panelbody::-webkit-scrollbar { width: 8px; }
+  #panelbody::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+  .section { margin-bottom: 22px; }
+  .section h3 {
+    margin: 0 0 10px; font-size: 10.5px; letter-spacing: 0.18em; color: var(--dim);
+    font-weight: 600; text-transform: lowercase; border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 7px 0; }
+  .row label { color: var(--dim); font-size: 12px; flex: 0 0 auto; }
+  .row .val { color: var(--accent); font-size: 11px; min-width: 34px; text-align: right; }
+  input[type=range] { flex: 1; height: 2px; appearance: none; background: var(--line); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: none;
+  }
+  select, input[type=text] {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 3px; padding: 4px 6px; font-size: 12px; font-family: inherit;
+  }
+  select:focus, input[type=text]:focus { outline: none; border-color: var(--accent); }
+  .swatches { display: flex; gap: 6px; margin: 7px 0; }
+  .swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .swatch.on { border-color: var(--accent); }
+  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .card {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 4px;
+    padding: 10px; margin: 8px 0;
+  }
+  .card .t { display: flex; justify-content: space-between; align-items: baseline; }
+  .card .t b { font-size: 12.5px; font-weight: 600; }
+  .card .t span { color: var(--dim); font-size: 10.5px; }
+  .card .meta { color: var(--dim); font-size: 11px; margin: 4px 0; line-height: 1.5; }
+  .card .hash { font-family: ui-monospace, monospace; font-size: 10px; color: var(--accent2); word-break: break-all; }
+  .gate-ok { color: var(--good); }
+  .gate-bad { color: var(--bad); }
+  .pill {
+    display: inline-block; font-size: 10px; border: 1px solid var(--line);
+    border-radius: 8px; padding: 1px 7px; color: var(--dim); margin-right: 4px;
+  }
+  .pill.gold { color: var(--accent); border-color: var(--accent); }
+  .hint { color: var(--dim); font-size: 11px; line-height: 1.55; margin: 6px 0; }
+  .list-item {
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+    border: 1px solid var(--line); border-radius: 3px; margin: 5px 0; background: var(--panel2);
+  }
+  .list-item .name { flex: 1; font-size: 12px; }
+  .empty { color: var(--dim); font-size: 11.5px; font-style: italic; }
+
+  /* viewport */
+  #viewport { position: relative; min-width: 0; background: #000; }
+  #viewport canvas { display: block; width: 100%; height: 100%; }
+  #vpoverlay {
+    position: absolute; top: 10px; left: 12px; font-size: 11px; color: var(--dim);
+    pointer-events: none; line-height: 1.7;
+  }
+  #vpoverlay b { color: var(--accent); font-weight: 600; }
+  #vpmode {
+    position: absolute; top: 10px; right: 12px; font-size: 10.5px; color: var(--accent);
+    border: 1px solid var(--line); padding: 3px 8px; border-radius: 3px; background: rgba(16,17,20,0.7);
+  }
+  #capturebtnwrap { position: absolute; bottom: 14px; right: 14px; display: flex; gap: 8px; }
+
+  /* capture bar */
+  #capturebar {
+    border-top: 1px solid var(--line); background: var(--panel);
+    display: grid; grid-template-columns: 210px 1fr; min-height: 0;
+  }
+  #capleft { border-right: 1px solid var(--line); padding: 12px 14px; }
+  #capleft h3 { margin: 0 0 8px; font-size: 10.5px; letter-spacing: 0.18em; color: var(--dim); font-weight: 600; }
+  #capstrip { display: flex; flex-wrap: wrap; gap: 10px; overflow-x: auto; padding: 12px; align-items: stretch; }
+  #capstrip > div { width: 100%; }
+  .capstrip-row { display: flex; gap: 10px; overflow-x: auto; align-items: stretch; }
+  .vidrow { display: flex; gap: 10px; overflow-x: auto; align-items: stretch; flex-wrap: wrap; }
+  .vidcard { min-width: 210px; max-width: 320px; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .vidcard.live { border-color: var(--accent); }
+  #capstrip::-webkit-scrollbar { height: 8px; }
+  #capstrip::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  .capcard {
+    flex: 0 0 auto; width: 168px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--panel2); overflow: hidden;
+  }
+  .capcard img { width: 100%; height: 96px; object-fit: cover; display: block; background: #000; }
+  .capcard .cc-body { padding: 5px 7px; }
+  .capcard .cc-name { font-size: 11px; color: var(--text); width: 100%; background: none; border: none; font-family: inherit; }
+  .capcard .cc-name:focus { border-bottom: 1px solid var(--accent); outline: none; }
+  .capcard .cc-meta { color: var(--dim); font-size: 9.5px; margin: 2px 0 4px; }
+  .capcard .cc-actions { display: flex; gap: 3px; }
+
+  /* toast + errors */
+  #toast {
+    position: fixed; bottom: 154px; left: 50%; transform: translateX(-50%);
+    background: var(--panel2); border: 1px solid var(--accent); color: var(--text);
+    padding: 8px 16px; border-radius: 4px; font-size: 12px; opacity: 0;
+    transition: opacity 0.25s; pointer-events: none; z-index: 50;
+  }
+  #toast.show { opacity: 1; }
+  #capmodal {
+    position: fixed; inset: 0; z-index: 90; background: rgba(10, 10, 12, 0.92);
+    display: none; align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  #capmodal img { max-width: 92vw; max-height: 88vh; border: 1px solid var(--line); }
+  #capmodal .capmodal-meta {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    color: var(--dim); font-size: 11px;
+  }
+  #rec-frame {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    border: 1px dashed var(--accent); pointer-events: none; z-index: 5;
+    box-shadow: 0 0 0 200vmax rgba(8, 8, 10, 0.35);
+  }
+  #photo-size, #rec-size { padding: 4px 6px; font-size: 11px; }
+  #vidmodal {
+    position: fixed; inset: 0; z-index: 90; background: rgba(10, 10, 12, 0.92);
+    display: none; align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  #vidmodal video { max-width: 92vw; max-height: 88vh; border: 1px solid var(--line); }
+  #vidmodal .capmodal-meta {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    color: var(--dim); font-size: 11px;
+  }
+  #errbox {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: none;
+    background: #3a1515; color: #ffd9d9; font-family: ui-monospace, monospace;
+    font-size: 11px; padding: 10px 14px; white-space: pre-wrap; max-height: 45vh; overflow: auto;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span id="wordmark">studiogram</span>
+    <span id="tagline">virtual product photography studio · first pass · deterministic renders, one artifact</span>
+    <span class="spacer"></span>
+    <span id="gatebadge">provenance gate: checking…</span>
+    <button class="btn" id="btn-export-state">export scene state</button>
+    <button class="btn" id="btn-import-state">import scene state</button>
+    <button class="btn" id="btn-reset-scene">reset scene</button>
+  </div>
+  <div id="main">
+    <div id="panel">
+      <div id="tabs">
+        <button data-tab="subject" class="on">subject</button>
+        <button data-tab="jewelry">jewelry</button>
+        <button data-tab="pose">pose</button>
+        <button data-tab="camera">camera</button>
+        <button data-tab="light">light</button>
+        <button data-tab="scene">scene</button>
+      </div>
+      <div id="panelbody"></div>
+    </div>
+    <div id="viewport">
+      <div id="vpoverlay"></div>
+      <div id="vpmode">free orbit</div>
+      <div id="capturebtnwrap">
+        <button class="btn primary" id="btn-capture">capture frame</button>
+        <select id="photo-size" class="btn" title="photo export dimensions">
+          <option value="viewport">viewport size</option>
+          <option value="square">1:1 1080</option>
+          <option value="portrait">4:5 1080x1350</option>
+          <option value="vertical">9:16 1080x1920</option>
+          <option value="wide">16:9 1920x1080</option>
+        </select>
+        <select id="rec-size" class="btn" title="recording dimensions">
+          <option value="viewport">viewport size</option>
+          <option value="square">1:1 1080</option>
+          <option value="portrait">4:5 1080x1350</option>
+          <option value="vertical">9:16 1080x1920</option>
+          <option value="wide">16:9 1920x1080</option>
+        </select>
+        <button class="btn" id="btn-record">record video</button>
+      </div>
+    </div>
+  </div>
+  <div id="capturebar">
+    <div id="capleft">
+      <h3>capture set</h3>
+      <div class="hint">captures are creator outputs for product presentation. the platform owns listing content, the studio owns the release, the scene owns the view.</div>
+      <div class="btnrow">
+        <button class="btn" id="btn-export-caps">export set as png</button>
+        <button class="btn" id="btn-batch-repro">reproduce set</button>
+      </div>
+      <div class="hint" id="capcount">0 captures</div>
+    </div>
+    <div id="capstrip"></div>
+  </div>
+</div>
+<div id="errbox"></div>
+<div id="capmodal"><img alt="capture" /><div class="capmodal-meta"></div></div>
+<div id="vidmodal"><video controls muted playsinline></video><div class="capmodal-meta"></div></div>
+<div id="toast"></div>
+<input type="file" id="file-import" accept="application/json" style="display:none" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "data:application/javascript;base64,__THREE_B64__",
+    "three/addons/controls/OrbitControls.js": "data:application/javascript;base64,__ORBITCONTROLS_B64__",
+    "three/addons/environments/RoomEnvironment.js": "data:application/javascript;base64,__ROOMENVIRONMENT_B64__",
+    "three/addons/loaders/GLTFLoader.js": "data:application/javascript;base64,__GLTFLOADER_B64__",
+    "three/addons/utils/BufferGeometryUtils.js": "data:application/javascript;base64,__BUFFERGEOMETRYUTILS_B64__",
+    "mediabunny": "data:application/javascript;base64,__MEDIABUNNY_B64__"
+  }
+}
+</script>
+<script>
+// error trap: anything the module throws lands here so headless runs can read it
+window.addEventListener("error", function (e) {
+  var d = document.getElementById("errlog");
+  if (!d) {
+    d = document.createElement("div"); d.id = "errlog";
+    d.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:300;background:#211;color:#ff9c9c;padding:10px;font:12px ui-monospace,monospace;white-space:pre-wrap;max-width:90vw;border:1px solid #c66;";
+    document.body.appendChild(d);
+  }
+  d.textContent = (d.textContent ? d.textContent + "\n" : "") + (e.message || "error") + " @ " + (e.filename || "?").split("/").pop() + ":" + e.lineno;
+});
+window.addEventListener("unhandledrejection", function (e) {
+  var d = document.getElementById("errlog");
+  if (!d) {
+    d = document.createElement("div"); d.id = "errlog";
+    d.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:300;background:#211;color:#ff9c9c;padding:10px;font:12px ui-monospace,monospace;white-space:pre-wrap;max-width:90vw;border:1px solid #c66;";
+    document.body.appendChild(d);
+  }
+  d.textContent = (d.textContent ? d.textContent + "\n" : "") + "unhandled rejection: " + (e.reason && (e.reason.stack || e.reason.message) || String(e.reason));
+});
+</script>
+<script type="module">

@@ -1,0 +1,12 @@
+# blender runtime used by the export scripts lives outside the repo
+blender-4.2.7-linux-x64/
+# node deps for local syntax checks
+node_modules/
+# regenerable analysis intermediates
+customized-hands/tex-lum.bin
+customized-hands/distal-mask.bin
+# one-off qa renders from the verification loop
+artifact/preview*.png
+posing-studio/pose_*.png
+*.zip
+.env
