@@ -750,8 +750,13 @@ function renderFrame() {
   compMat.uniforms.tDepth.value = rtDepth;
   compMat.uniforms.uNear.value = activeCam.near;
   compMat.uniforms.uFar.value = activeCam.far;
-  compMat.uniforms.uFocus.value = S.live.focaldistance;
-  compMat.uniforms.uAperture.value = apertureFromFocalLength(S.live.focallength);
+  // focus follows the active camera: pinned shots use the focus the pinned
+  // camera recorded, so the blurred backdrop is the set the creator pinned.
+  // live orbit uses the sliders. otherwise a stale slider would bleed into
+  // every pinned render and its deterministic reproduction.
+  const [lensFl, lensFd] = activeLens();
+  compMat.uniforms.uFocus.value = lensFd;
+  compMat.uniforms.uAperture.value = apertureFromFocalLength(lensFl);
   compMat.uniforms.uTexel.value.set(1 / rt.width, 1 / rt.height);
   renderer.setRenderTarget(rt);
   renderer.clear();
@@ -800,6 +805,12 @@ controls.addEventListener("change", () => {
 });
 const round = (v) => Math.round(v * 10) / 10;
 
+// the lens values in effect: the pinned camera's own focus when pinned,
+// the live sliders in orbit. renderFrame's focus matches this exactly.
+function activeLens() {
+  const pin = S.live.mode === "pinned" ? currentPinned() : null;
+  return pin ? [pin.focallength, pin.focaldistance] : [S.live.focallength, S.live.focaldistance];
+}
 function syncModeBadge() {
   $("#vpmode").textContent = S.live.mode === "pinned" ? `pinned: ${S.live.pinned}` : "free orbit";
 }
@@ -807,7 +818,7 @@ function updateVpOverlay() {
   const n = S.jewelry.length;
   $("#vpoverlay").innerHTML =
     `<b>studiogram</b> · ${n} artifact${n === 1 ? "" : "s"} in scene<br>` +
-    `fov ${S.live.fov.toFixed(0)} · focallength ${S.live.focallength} · focaldistance ${S.live.focaldistance}`;
+    `fov ${activeCamera().fov.toFixed(0)} · focallength ${activeLens()[0]} · focaldistance ${activeLens()[1]}`;
 }
 
 // ===== part 05: the hand =====
@@ -2964,7 +2975,7 @@ async function captureFrame() {
   settleSlides(); // the take photographs the committed state, never a mid-slide frame
   const pinned = S.live.mode === "pinned" ? currentPinned() : null;
   const cameraState = pinned
-    ? { mode: "pinned", name: pinned.name, position: [...pinned.position], target: [...pinned.target], fov: pinned.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance }
+    ? { mode: "pinned", name: pinned.name, position: [...pinned.position], target: [...pinned.target], fov: pinned.fov, focallength: pinned.focallength, focaldistance: pinned.focaldistance }
     : { mode: "orbit", name: null, position: [...S.live.position], target: [...S.live.target], fov: S.live.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance };
   const snapshot = sceneCoreState();
   const state_hash = await sha256hex(snapshot);
@@ -3749,6 +3760,14 @@ async function runSelfTest() {
   results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
   deleteCapture(photoBackToBack);
   results.push("photo camera name: " + photo.camera.name + ", mode: " + photo.camera.mode);
+  // pinned depth of field comes from the pinned camera record, not the live
+  // sliders: moving the sliders while pinned must not change the frame.
+  const pinnedPng = await renderPng(200, 200);
+  const saveFl = S.live.focallength, saveFd = S.live.focaldistance;
+  S.live.focallength = 135; S.live.focaldistance = 120;
+  const movedPng = await renderPng(200, 200);
+  S.live.focallength = saveFl; S.live.focaldistance = saveFd;
+  results.push("pinned render ignores live focus sliders: " + (pinnedPng === movedPng));
   results.push("photo gate record: " + JSON.stringify(photo.gate));
   const takePng = CAPTURE_IMG.get(photo.id);
   S.cameras.find((c) => c.name === "selftest cam").position = [300, 400, 500];

@@ -107,6 +107,14 @@ async function runSelfTest() {
   results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
   deleteCapture(photoBackToBack);
   results.push("photo camera name: " + photo.camera.name + ", mode: " + photo.camera.mode);
+  // pinned depth of field comes from the pinned camera record, not the live
+  // sliders: moving the sliders while pinned must not change the frame.
+  const pinnedPng = await renderPng(200, 200);
+  const saveFl = S.live.focallength, saveFd = S.live.focaldistance;
+  S.live.focallength = 135; S.live.focaldistance = 120;
+  const movedPng = await renderPng(200, 200);
+  S.live.focallength = saveFl; S.live.focaldistance = saveFd;
+  results.push("pinned render ignores live focus sliders: " + (pinnedPng === movedPng));
   results.push("photo gate record: " + JSON.stringify(photo.gate));
   const takePng = CAPTURE_IMG.get(photo.id);
   S.cameras.find((c) => c.name === "selftest cam").position = [300, 400, 500];

@@ -47,6 +47,11 @@ photo: {
   plus verified mesh hashes. this is the "recording" side of photo
   taking: not just what it looked like, but that every piece in frame
   was a verified release at that moment.
+- depth of field follows the active camera: a pinned camera carries its own
+  focallength/focaldistance (recorded at pin time), and every render while
+  pinned, plus the photo's camera record, uses those. the live sliders only
+  steer the orbit view. this keeps the out-of-focus backdrop part of the
+  pinned set rather than an accident of the last slider touch.
 - full png frames stay in memory only, thumbnails in state (unchanged).
 
 ### d2. capture sets are the recording of a shoot

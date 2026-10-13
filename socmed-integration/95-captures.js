@@ -83,7 +83,7 @@ async function captureFrame() {
   settleSlides(); // the take photographs the committed state, never a mid-slide frame
   const pinned = S.live.mode === "pinned" ? currentPinned() : null;
   const cameraState = pinned
-    ? { mode: "pinned", name: pinned.name, position: [...pinned.position], target: [...pinned.target], fov: pinned.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance }
+    ? { mode: "pinned", name: pinned.name, position: [...pinned.position], target: [...pinned.target], fov: pinned.fov, focallength: pinned.focallength, focaldistance: pinned.focaldistance }
     : { mode: "orbit", name: null, position: [...S.live.position], target: [...S.live.target], fov: S.live.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance };
   const snapshot = sceneCoreState();
   const state_hash = await sha256hex(snapshot);
