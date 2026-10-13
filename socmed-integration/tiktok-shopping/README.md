@@ -47,6 +47,35 @@ options are:
 the studio's take: option 2 for fixed products if any exist, option 3
 for made-to-order, re-decided when tiktok ships line-item support.
 
+## the affiliate engine (2026 numbers, the deep pass)
+
+tiktok shop crossed $1 billion in monthly us gmv in early 2026, and
+the engine underneath is the creator affiliate network, not ads:
+
+- 2m+ affiliate creators in the program; average commission around
+  15 percent, 4 to 20 percent by niche
+- where us shop gmv comes from: short-form video still roughly half,
+  the shop tab the second-largest channel, live commerce at about
+  14 percent and growing
+- the affiliate marketplace is open collaboration: a brand posts
+  target-based commission offers and creators sample, film, and sell
+  on their own accounts - distribution without ad spend, paid only
+  on sales
+
+for a small mto brand this is the lever to pull if shop listings
+exist: affiliates solve reach, but they settle per order on fixed
+variants, so the mto conflict below still gates what can be sold
+through them.
+
+## the publish api, verified (2026-10-13)
+
+the content posting api now supports photos (up to 35 per post,
+pull-from-url, webp/jpeg max 1080p): the verified contract and its
+two walls - url-ownership verification and the client audit, plus no
+api product tagging - live on the commerce branch,
+socmed-integration/api/tiktok-content-posting-api.md. studio order
+stands: after pinterest.
+
 ## corpus evidence (175 tagged jewelry posts, 2026-10-12)
 
 - median 32k views, saves outrank comments ~12:1

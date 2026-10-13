@@ -49,7 +49,40 @@ per-platform dossiers live in the sibling folders:
 [pinterest-shopping/](pinterest-shopping/),
 [facebook-shopping/](facebook-shopping/),
 [youtube-shopping/](youtube-shopping/), [x-shopping/](x-shopping/),
-[tumblr-shopping/](tumblr-shopping/).
+[tumblr-shopping/](tumblr-shopping/), [reddit-shopping/](reddit-shopping/),
+[lemon8-shopping/](lemon8-shopping/), and
+[xiaohongshu-shopping/](xiaohongshu-shopping/).
+
+## the nine-platform pass (checked 2026-10-13)
+
+one line each, the commerce state of the nine:
+
+- **tiktok shop**: in-app checkout, $1b+ monthly us gmv, the affiliate
+  engine is the distribution lever; mto still breaks native checkout
+- **reddit**: shopping arrived in 2026 but as ad inventory (in-search
+  carousels, shopify sync); organic stays community-governed and
+  untaggable
+- **pinterest**: catalog feed -> product pins, 24 tags per pin, and
+  the only platform whose api sets the tags (the publish glue is
+  built, commerce branch)
+- **instagram**: catalog + 20 tags per post, checkout on the site; the
+  publish glue is built, tagging is the in-app handoff
+- **lemon8**: no commerce at all; affiliate links in descriptions, a
+  manual-repost discovery bet on bytedance's western xiaohongshu
+- **tumblr**: no commerce; affiliate links with disclosure, process
+  storytelling for the craft niche
+- **xiaohongshu (rednote/red)**: content, trust, and checkout in one
+  app, 376m mau, the cross-border redshop is the only selling door
+  for a us brand; a presence bet now, a market-entry decision later
+- **x (twitter)**: no organic shopping, 2023 experiments dead;
+  e-commerce is dynamic product ads from a feed plus link-out
+- **youtube shorts**: merchant tags resolve to the google merchant
+  center catalog, checkout on the site; the affiliate surface keeps
+  expanding and originality is now algorithmically rewarded
+
+the checkout map does not move: in-app only on tiktok shop and
+xiaohongshu (through the cross-border door), everything else links
+to the pdp.
 
 ## the binding: the release hash is the product identity
 

@@ -43,3 +43,13 @@ catalog display, not a checkout.
 
 all presets exist in the current export except 3:4 (flagged in
 [social-commerce-reference.md](../social-commerce-reference.md)).
+
+## the 2026 conversion reality (checked 2026-10-13)
+
+with checkout living on the site, the tag is only the door: the meta
+pixel and the conversions api are the wiring meta actually optimizes
+with, and advantage+ campaigns fly blind without clean server-side
+tracking and an accurate catalog. the studio side of that is already
+planned - the feed builders (commerce branch) and the pixel
+content-id rule (tag id equals feed sku) exist precisely so the
+purchase event can match the catalog row.

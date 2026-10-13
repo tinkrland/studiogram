@@ -6,6 +6,10 @@ x has no organic commerce surface: the shopping experiments
 sources. what remains is dynamic product ads (from a feed, via the
 ad platform) and link-out.
 
+re-verified 2026-10-13: nothing changed - no organic shopping
+surface, the 2023 shops experiment stayed dead, and e-commerce on x
+remains dynamic product ads from a synced feed plus link-out.
+
 ## what x is good for
 
 - broadcast and cultural-relevance posts with a link out to the pdp

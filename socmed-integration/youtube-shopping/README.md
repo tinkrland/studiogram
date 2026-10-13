@@ -40,3 +40,15 @@ routes matter to kirosculp, on opposite sides of the sale.
   extending past 60 seconds starts excluding instagram reels, so
   platform-targeted exports should stay under 60 for dual use
 - long-form how-its-made content reuses the same records
+
+
+## 2026 refresh (checked 2026-10-13)
+
+- made on youtube 2026 widened the affiliate surface: amazon product
+  tagging reached india and brazil with the program expanding - the
+  merchant route is unchanged (google merchant center), but the
+  affiliate side keeps growing, which raises the odds of us creators
+  tagging kirosculp pieces on commission
+- youtube now prioritizes original shorts (announced 2026-10-01):
+  reuploads lose reach, original creation wins it. the studio's
+  renders are original by construction, so the change is tailwind
