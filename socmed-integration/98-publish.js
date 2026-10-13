@@ -64,6 +64,7 @@ function connectInstagram() {
 }
 window.addEventListener("message", (e) => {
   if (!e.data || typeof e.data.ok !== "boolean") return;
+  if (e.data.provider) return; // other platforms (99) tag their messages
   if (e.data.ok) {
     igConnSave({ access_token: e.data.access_token, ig_id: e.data.ig_id, username: e.data.username });
     toast("instagram connected" + (e.data.username ? " as @" + e.data.username : ""));

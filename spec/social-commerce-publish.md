@@ -99,6 +99,36 @@ now have verified publish contracts in
   anything posts public; inbox-upload mode is the honest testing path
   until then
 
+## the pinterest glue (built, 2026-10-13)
+
+pinterest is the second platform, chosen first among the others
+because its api sets product tags and its only gate is the
+standard-access video review. same shape as the instagram glue:
+
+- artifact module [99-pinterest.js](../socmed-integration/99-pinterest.js):
+  connect button, board picker, "post set to pinterest". the token
+  stays in sessionStorage (tab session only); the instagram listener
+  ignores provider-tagged messages and vice versa
+- backend functions (secret stays server-side): studioPinterestConfig
+  (authorize url, scopes boards+pins+user_accounts),
+  studioPinterestCallback (v5 token exchange, basic auth, provider:
+  "pinterest" postMessage), studioPinterestBoards (bookmark-paginated
+  proxy), studioPinterestCreatePin (1-5 images: image_url or
+  multiple_image_urls with per-image listing links, records
+  StudioPublishedSet), studioPinterestProductTags (1-24 product pin
+  ids, ships ahead of the catalog)
+- the multi-image pin maps a capture set directly: per image the bound
+  listing title (100), alt text (800 as description), and the pdp as
+  that image's link. sets larger than 5 take their first 5 and say so
+- photos reuse the instagram glue's jpeg hosting (studioUploadPhoto /
+  studioPhoto): pinterest accepts public urls, no domain verification
+- product tags are the differentiator: once the catalog feed produces
+  product pins, the studio tags them onto the hero pin through the
+  api, no in-app handoff. until the catalog exists the ui does not
+  offer tagging
+- qa: scripts/qa-pinterest.mjs (19 checks) green; qa-publish and
+  qa-commerce still green; build green
+
 ## multi-user by design
 
 the glue is for the studio's users, not one owner account. every user

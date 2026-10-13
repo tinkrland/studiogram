@@ -242,6 +242,7 @@ function renderCaptureStrip() {
   strip.appendChild(stripRow);
   renderCommerceBar();
   renderPublishBar();
+  renderPinterestBar();
 }
 function moveCapture(i, dir) {
   const set = activeSet();
