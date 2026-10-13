@@ -178,7 +178,7 @@
     border: 1px dashed var(--accent); pointer-events: none; z-index: 5;
     box-shadow: 0 0 0 200vmax rgba(8, 8, 10, 0.35);
   }
-  #rec-size { padding: 4px 6px; font-size: 11px; }
+  #photo-size, #rec-size { padding: 4px 6px; font-size: 11px; }
   #vidmodal {
     position: fixed; inset: 0; z-index: 90; background: rgba(10, 10, 12, 0.92);
     display: none; align-items: center; justify-content: center; cursor: zoom-out;
@@ -223,6 +223,13 @@
       <div id="vpmode">free orbit</div>
       <div id="capturebtnwrap">
         <button class="btn primary" id="btn-capture">capture frame</button>
+        <select id="photo-size" class="btn" title="photo export dimensions">
+          <option value="viewport">viewport size</option>
+          <option value="square">1:1 1080</option>
+          <option value="portrait">4:5 1080x1350</option>
+          <option value="vertical">9:16 1080x1920</option>
+          <option value="wide">16:9 1920x1080</option>
+        </select>
         <select id="rec-size" class="btn" title="recording dimensions">
           <option value="viewport">viewport size</option>
           <option value="square">1:1 1080</option>

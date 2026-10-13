@@ -30,7 +30,7 @@ async function runSelfTest() {
   results.push("ring box empty: " + box.isEmpty() + ", center: " + box.getCenter(new THREE.Vector3()).toArray().map((n) => n.toFixed(1)).join(", "));
   const ndc = box.getCenter(new THREE.Vector3()).project(camera);
   results.push("ring ndc: " + ndc.toArray().map((n) => n.toFixed(2)).join(", "));
-  const png = await renderPng(400);
+  const png = await renderPng(400, 400);
   const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = png; });
   const cv = document.createElement("canvas"); cv.width = cv.height = 400;
   const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);
@@ -59,7 +59,7 @@ async function runSelfTest() {
   // preset is a prefill and not a separate rendering path
   S.environment = { bg: "#3d6b4a", center: "#3d6b4a", preset: "manual green" };
   applyEnvironment();
-  const pngEnv = await renderPng(400);
+  const pngEnv = await renderPng(400, 400);
   const imgE = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = pngEnv; });
   const cvE = document.createElement("canvas"); cvE.width = cvE.height = 400;
   const ctxE = cvE.getContext("2d"); ctxE.drawImage(imgE, 0, 0);
@@ -98,7 +98,11 @@ async function runSelfTest() {
   S.cameras.push({ name: "selftest cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
   S.live = { ...S.live, mode: "pinned", pinned: "selftest cam" };
   syncModeBadge();
+  $("#photo-size").value = "portrait"; // 4:5: the photo's chosen dimensions are part of its truth
   const photo = await captureFrame();
+  const pngDims = (dataUrl) => new Promise((res) => { const i = new Image(); i.onload = () => res(i.naturalWidth + "x" + i.naturalHeight); i.src = dataUrl; });
+  results.push("photo dimensions recorded: " + photo.width + "x" + photo.height);
+  results.push("photo renders at its chosen dimensions: " + (await pngDims(CAPTURE_IMG.get(photo.id))) + " (expect 1080x1350)");
   const photoBackToBack = await captureFrame();
   results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
   deleteCapture(photoBackToBack);
@@ -124,6 +128,12 @@ async function runSelfTest() {
   const photo2 = await captureFrame();
   results.push("second set numbering restarts: " + photo2.name + " in " + activeSet().name);
   results.push("export filename: " + exportFilename(photo2));
+  // a photo from before this pass has no width/height: it reproduces at the
+  // legacy square size instead of failing
+  const legacy = { id: "legacy", name: "legacy square", camera: { ...photo.camera }, created_utc: nowUtc(), state_hash: photo.state_hash, snapshot: sceneCoreState(), gate: [] };
+  await reproduceCapture(legacy);
+  results.push("photo without recorded dimensions falls back to legacy square: " + (await pngDims(CAPTURE_IMG.get("legacy"))) + " (expect 1600x1600)");
+  $("#photo-size").value = "viewport";
   S.active_set = "set1";
   S.cameras = S.cameras.filter((c) => c.name !== "selftest cam");
   S.live = { ...S.live, mode: "orbit" };
@@ -261,7 +271,7 @@ async function runSceneAudit() {
   results.push("meshes in scene: " + meshCount + ", ring mesh: " + !!ring + (ring ? ", ring parent type " + ring.parent.parent.type : ""));
   results.push("jewelry: " + ([...JEWELRY.values()].map((j) =>
     (j.rec?.name || "?") + " v" + (j.rec?.version ?? "?") + " (" + j.source + ")").join(" | ") || "none in scene"));
-  const png = await renderPng(400);
+  const png = await renderPng(400, 400);
   const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = png; });
   const cv = document.createElement("canvas"); cv.width = cv.height = 400;
   const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);

@@ -187,8 +187,8 @@ function deleteSavedHand(cfg) {
 // captures keep a thumbnail in saved state; full png frames live in memory only.
 function serializeState(withThumbs) {
   const photos = S.photos.map((c) => {
-    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot, gate: c.gate || [] };
-    if (withThumbs && CAPTURE_THUMBS[c.id]) o.thumb = CAPTURE_THUMBS[c.id];
+    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot, gate: c.gate || [], width: c.width, height: c.height };
+    if (withThumbs && CAPTURE_THUMBS.get(c.id)) o.thumb = CAPTURE_THUMBS.get(c.id);
     return o;
   });
   return { ...S, captures: undefined, photos };

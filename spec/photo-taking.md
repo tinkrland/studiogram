@@ -66,6 +66,18 @@ the single global strip becomes named, ordered capture sets:
 - export exports the active set in order as pngs, filenames prefixed by
   the set name: `shoot-1-capture-01.png`. carousel-ready ordering is the
   set's order.
+- export dimensions are the photo's truth: a `#photo-size` selector beside
+  the capture button offers viewport, 1:1 1080, 4:5 1080x1350, 9:16
+  1080x1920, and 16:9 1920x1080 (the same preset library video recording
+  uses, per
+  [../socmed-integration/platform-reference.md](../socmed-integration/platform-reference.md)
+  and d3 of [video-recording.md](video-recording.md)). the chosen
+  dimensions are recorded on the photo as `width`/`height` at capture,
+  capture and every reproduce render exactly those pixels, and the
+  framing overlay (which the video pass built) arms for the photo
+  selector whenever it is not viewport and no take is running. photos
+  taken before this pass carry no dimensions and reproduce at the
+  legacy 1600x1600 square.
 
 ### d3. what references what (the rooms.xyz shape, precisely)
 
@@ -97,11 +109,14 @@ restored from scene state on reset (existing). pinned cameras and photos
 are saved scene state. this matches the reference platform's rule: runtime
 changes are ephemeral by default, edit-mode originals are restored on
 reset. video/live streaming stays out: the reference platform streams
-live in-scene; export for listings is ours, and only photos are in
-scope. animated outputs remain parked under the movement decision.
+live in-scene; export for listings is ours. animated output is no longer
+parked: video recording is built per [video-recording.md](video-recording.md).
 
 ## acceptance
 
+- selftest: a photo captured with 4:5 selected records 1080x1350 and
+  renders at exactly those pixels; a photo without recorded dimensions
+  (pre-pass) reproduces at the legacy 1600x1600 square without failing.
 - selftest: take a photo from a named camera, reframe that camera,
   reproduce the photo, assert the rendered pixels match the take-time
   values (frame equality against the take's png), proving the name is

@@ -178,7 +178,7 @@
     border: 1px dashed var(--accent); pointer-events: none; z-index: 5;
     box-shadow: 0 0 0 200vmax rgba(8, 8, 10, 0.35);
   }
-  #rec-size { padding: 4px 6px; font-size: 11px; }
+  #photo-size, #rec-size { padding: 4px 6px; font-size: 11px; }
   #vidmodal {
     position: fixed; inset: 0; z-index: 90; background: rgba(10, 10, 12, 0.92);
     display: none; align-items: center; justify-content: center; cursor: zoom-out;
@@ -223,6 +223,13 @@
       <div id="vpmode">free orbit</div>
       <div id="capturebtnwrap">
         <button class="btn primary" id="btn-capture">capture frame</button>
+        <select id="photo-size" class="btn" title="photo export dimensions">
+          <option value="viewport">viewport size</option>
+          <option value="square">1:1 1080</option>
+          <option value="portrait">4:5 1080x1350</option>
+          <option value="vertical">9:16 1080x1920</option>
+          <option value="wide">16:9 1920x1080</option>
+        </select>
         <select id="rec-size" class="btn" title="recording dimensions">
           <option value="viewport">viewport size</option>
           <option value="square">1:1 1080</option>
@@ -842,8 +849,8 @@ function deleteSavedHand(cfg) {
 // captures keep a thumbnail in saved state; full png frames live in memory only.
 function serializeState(withThumbs) {
   const photos = S.photos.map((c) => {
-    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot, gate: c.gate || [] };
-    if (withThumbs && CAPTURE_THUMBS[c.id]) o.thumb = CAPTURE_THUMBS[c.id];
+    const o = { id: c.id, name: c.name, camera: c.camera, created_utc: c.created_utc, state_hash: c.state_hash, snapshot: c.snapshot, gate: c.gate || [], width: c.width, height: c.height };
+    if (withThumbs && CAPTURE_THUMBS.get(c.id)) o.thumb = CAPTURE_THUMBS.get(c.id);
     return o;
   });
   return { ...S, captures: undefined, photos };
@@ -2883,11 +2890,33 @@ function sceneCoreState() {
   }));
 }
 
-async function renderPng(size) {
-  const prevMode = S.live.mode;
+// the export dimension library, shared with video recording: presets are
+// prefilled values on the same controls, never a separate rendering path
+const EXPORT_SIZES = {
+  viewport: { label: "viewport" },
+  square: { label: "1:1 · 1080", width: 1080, height: 1080 },
+  portrait: { label: "4:5 · 1080x1350", width: 1080, height: 1350 },
+  vertical: { label: "9:16 · 1080x1920", width: 1080, height: 1920 },
+  wide: { label: "16:9 · 1920x1080", width: 1920, height: 1080 },
+};
+function chosenDims(selectEl) {
+  const preset = EXPORT_SIZES[$(selectEl).value] || EXPORT_SIZES.viewport;
+  if (preset.width) return { width: preset.width, height: preset.height };
+  const canvas = renderer.domElement;
+  return {
+    width: canvas.clientWidth - (canvas.clientWidth % 2),
+    height: canvas.clientHeight - (canvas.clientHeight % 2),
+  };
+}
+function photoDims(photo) {
+  // a photo's dimensions are part of its recorded truth; photos from before
+  // this pass exported square, so that stays their fallback
+  return { width: photo.width || 1600, height: photo.height || 1600 };
+}
+async function renderPng(width, height) {
   renderer.setPixelRatio(1);
-  renderer.setSize(size, size, false);
-  camera.aspect = 1; pinnedHelper.aspect = 1;
+  renderer.setSize(width, height, false);
+  camera.aspect = width / height; pinnedHelper.aspect = width / height;
   renderFrame();
   const url = renderer.domElement.toDataURL("image/png");
   resize();
@@ -2936,12 +2965,13 @@ async function captureFrame() {
     : { mode: "orbit", name: null, position: [...S.live.position], target: [...S.live.target], fov: S.live.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance };
   const snapshot = sceneCoreState();
   const state_hash = await sha256hex(snapshot);
-  const png = await renderPng(1600);
+  const dims = chosenDims("#photo-size"); // the dimensions chosen before the capture are the photo's truth
+  const png = await renderPng(dims.width, dims.height);
   const thumb = await makeThumb(png);
   const id = "c" + Math.random().toString(36).slice(2, 9);
   const set = activeSet();
   const name = `capture ${String((set.photo_ids || []).length + 1).padStart(2, "0")}`;
-  const photo = { id, name, camera: cameraState, created_utc: nowUtc(), state_hash, snapshot, gate: gateRecordAtTake() };
+  const photo = { id, name, camera: cameraState, created_utc: nowUtc(), state_hash, snapshot, gate: gateRecordAtTake(), width: dims.width, height: dims.height };
   S.photos.push(photo);
   set.photo_ids.push(id);
   CAPTURE_IMG.set(id, png);
@@ -2955,7 +2985,8 @@ async function reproduceCapture(photo) {
   if (!photo.snapshot) { toast("this photo predates full snapshots"); return; }
   const prev = sceneCoreState();
   await applyCoreState(photo.snapshot);
-  const png = await renderPng(1600);
+  const dims = photoDims(photo);
+  const png = await renderPng(dims.width, dims.height);
   CAPTURE_IMG.set(photo.id, png);
   CAPTURE_THUMBS.set(photo.id, await makeThumb(png));
   await applyCoreState(prev);
@@ -2994,7 +3025,8 @@ async function reproduceActiveSet() {
   for (const photo of photos) {
     if (!photo.snapshot) continue;
     await applyCoreState(photo.snapshot);
-    const png = await renderPng(1600);
+    const dims = photoDims(photo);
+    const png = await renderPng(dims.width, dims.height);
     CAPTURE_IMG.set(photo.id, png);
     CAPTURE_THUMBS.set(photo.id, await makeThumb(png));
   }
@@ -3009,7 +3041,7 @@ function showCaptureModal(photo) {
   img.src = CAPTURE_IMG.get(photo.id) || CAPTURE_THUMBS.get(photo.id) || "";
   const cam = photo.camera;
   modal.querySelector(".capmodal-meta").textContent =
-    `${photo.name} · ${cam.mode}${cam.name ? " · camera " + cam.name : ""} · state sha-256 ${photo.state_hash.slice(0, 16)}… · ${photo.created_utc}` +
+    `${photo.name} · ${cam.mode}${cam.name ? " · camera " + cam.name : ""} · ${photoDims(photo).width}x${photoDims(photo).height} · state sha-256 ${photo.state_hash.slice(0, 16)}… · ${photo.created_utc}` +
     (photo.gate && photo.gate.length ? ` · ${photo.gate.length} verified release${photo.gate.length === 1 ? "" : "s"}` : "");
   modal.style.display = "flex";
 }
@@ -3071,7 +3103,7 @@ function renderCaptureStrip() {
     nameInp.type = "text"; nameInp.className = "cc-name"; nameInp.value = photo.name;
     nameInp.addEventListener("change", () => { photo.name = nameInp.value || photo.name; saveState(); });
     body.appendChild(nameInp);
-    body.appendChild(el("div", "cc-meta", `${photo.camera.mode}${photo.camera.name ? " · " + photo.camera.name : ""} · ${photo.created_utc} · state ${photo.state_hash.slice(0, 8)}`));
+    body.appendChild(el("div", "cc-meta", `${photo.camera.mode}${photo.camera.name ? " · " + photo.camera.name : ""} · ${photoDims(photo).width}x${photoDims(photo).height} · ${photo.created_utc} · state ${photo.state_hash.slice(0, 8)}`));
     const actions = el("div", "cc-actions");
     const mk = (label, fn, cls) => { const b = el("button", cls || "btn mini", label); b.addEventListener("click", fn); return b; };
     actions.append(
@@ -3133,15 +3165,10 @@ async function exportCaptureSet() {
 // the recording's dimensions are chosen up front (viewport or a platform
 // aspect); every export re-renders the record through webcodecs into mp4,
 // mov, or webm, so the same record exports to the same bytes forever.
+// the dimension presets are shared with photo export: EXPORT_SIZES in
+// socmed-integration/95-captures.js, which loads first
 const VIDEO_FPS = 30;
 const VIDEO_MAX_MS = 30000;
-const REC_SIZES = {
-  viewport: { label: "viewport" },
-  square: { label: "1:1 · 1080", width: 1080, height: 1080 },
-  portrait: { label: "4:5 · 1080x1350", width: 1080, height: 1350 },
-  vertical: { label: "9:16 · 1080x1920", width: 1080, height: 1920 },
-  wide: { label: "16:9 · 1920x1080", width: 1920, height: 1080 },
-};
 const RECORD_TAKES = new Map();  // recording id -> live take object url (memory only, never state)
 let REC = null;                   // the active take
 let VIEW_LOCKED = false;          // export and replay own the canvas while locked
@@ -3157,10 +3184,8 @@ function startRecording() {
   }
   settleSlides(); // the take starts from the committed state, never a mid-slide view
   const sizeKey = $("#rec-size").value || "viewport";
-  const preset = REC_SIZES[sizeKey];
-  const canvas = renderer.domElement;
-  const width = preset.width || (canvas.clientWidth - (canvas.clientWidth % 2));
-  const height = preset.height || (canvas.clientHeight - (canvas.clientHeight % 2));
+  const dims = chosenDims("#rec-size");
+  const width = dims.width, height = dims.height;
   REC = {
     t0: performance.now(),
     samples: [],
@@ -3223,19 +3248,25 @@ function updateRecordUi(msLeft) {
 }
 
 // the framing overlay shows what the chosen dimensions see, so a portrait
-// take can be composed while recording into it.
+// take or photo can be composed while recording into it. during a take the
+// recording's dimensions rule the overlay; otherwise it arms for the photo
+// selector, and clears entirely when the live viewport is what exports.
 function showRecFrameOverlay() {
   const vp = $("#viewport");
   let ov = document.getElementById("rec-frame");
-  if (!REC || REC.sizeKey === "viewport") { if (ov) ov.remove(); return; }
+  const frame = REC
+    ? { w: REC.width, h: REC.height, on: REC.sizeKey !== "viewport" }
+    : ($("#photo-size").value !== "viewport" ? chosenDims("#photo-size") : null);
+  if (!frame) { if (ov) ov.remove(); return; }
   if (!ov) { ov = document.createElement("div"); ov.id = "rec-frame"; vp.appendChild(ov); }
   const vw = vp.clientWidth, vh = vp.clientHeight;
-  const ar = REC.width / REC.height;
+  const ar = frame.w / frame.h;
   let w = vw * 0.92, h = w / ar;
   if (h > vh * 0.92) { h = vh * 0.92; w = h * ar; }
   ov.style.width = w + "px";
   ov.style.height = h + "px";
 }
+$("#photo-size").addEventListener("change", showRecFrameOverlay);
 
 // resample the live samples onto the fixed export grid: one path entry per
 // exported frame, camera values lerped between the bracketing live samples,
@@ -3637,7 +3668,7 @@ async function runSelfTest() {
   results.push("ring box empty: " + box.isEmpty() + ", center: " + box.getCenter(new THREE.Vector3()).toArray().map((n) => n.toFixed(1)).join(", "));
   const ndc = box.getCenter(new THREE.Vector3()).project(camera);
   results.push("ring ndc: " + ndc.toArray().map((n) => n.toFixed(2)).join(", "));
-  const png = await renderPng(400);
+  const png = await renderPng(400, 400);
   const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = png; });
   const cv = document.createElement("canvas"); cv.width = cv.height = 400;
   const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);
@@ -3666,7 +3697,7 @@ async function runSelfTest() {
   // preset is a prefill and not a separate rendering path
   S.environment = { bg: "#3d6b4a", center: "#3d6b4a", preset: "manual green" };
   applyEnvironment();
-  const pngEnv = await renderPng(400);
+  const pngEnv = await renderPng(400, 400);
   const imgE = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = pngEnv; });
   const cvE = document.createElement("canvas"); cvE.width = cvE.height = 400;
   const ctxE = cvE.getContext("2d"); ctxE.drawImage(imgE, 0, 0);
@@ -3705,7 +3736,11 @@ async function runSelfTest() {
   S.cameras.push({ name: "selftest cam", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 });
   S.live = { ...S.live, mode: "pinned", pinned: "selftest cam" };
   syncModeBadge();
+  $("#photo-size").value = "portrait"; // 4:5: the photo's chosen dimensions are part of its truth
   const photo = await captureFrame();
+  const pngDims = (dataUrl) => new Promise((res) => { const i = new Image(); i.onload = () => res(i.naturalWidth + "x" + i.naturalHeight); i.src = dataUrl; });
+  results.push("photo dimensions recorded: " + photo.width + "x" + photo.height);
+  results.push("photo renders at its chosen dimensions: " + (await pngDims(CAPTURE_IMG.get(photo.id))) + " (expect 1080x1350)");
   const photoBackToBack = await captureFrame();
   results.push("back-to-back takes byte-equal: " + (CAPTURE_IMG.get(photoBackToBack.id) === CAPTURE_IMG.get(photo.id)));
   deleteCapture(photoBackToBack);
@@ -3731,6 +3766,12 @@ async function runSelfTest() {
   const photo2 = await captureFrame();
   results.push("second set numbering restarts: " + photo2.name + " in " + activeSet().name);
   results.push("export filename: " + exportFilename(photo2));
+  // a photo from before this pass has no width/height: it reproduces at the
+  // legacy square size instead of failing
+  const legacy = { id: "legacy", name: "legacy square", camera: { ...photo.camera }, created_utc: nowUtc(), state_hash: photo.state_hash, snapshot: sceneCoreState(), gate: [] };
+  await reproduceCapture(legacy);
+  results.push("photo without recorded dimensions falls back to legacy square: " + (await pngDims(CAPTURE_IMG.get("legacy"))) + " (expect 1600x1600)");
+  $("#photo-size").value = "viewport";
   S.active_set = "set1";
   S.cameras = S.cameras.filter((c) => c.name !== "selftest cam");
   S.live = { ...S.live, mode: "orbit" };
@@ -3868,7 +3909,7 @@ async function runSceneAudit() {
   results.push("meshes in scene: " + meshCount + ", ring mesh: " + !!ring + (ring ? ", ring parent type " + ring.parent.parent.type : ""));
   results.push("jewelry: " + ([...JEWELRY.values()].map((j) =>
     (j.rec?.name || "?") + " v" + (j.rec?.version ?? "?") + " (" + j.source + ")").join(" | ") || "none in scene"));
-  const png = await renderPng(400);
+  const png = await renderPng(400, 400);
   const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = png; });
   const cv = document.createElement("canvas"); cv.width = cv.height = 400;
   const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);

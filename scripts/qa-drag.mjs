@@ -125,6 +125,22 @@ await new Promise((r) => setTimeout(r, 1500));
 const strip = await page.evaluate(() => document.querySelector("#capstrip")?.textContent || "");
 check("capture recorded as pinned", /pinned/.test(strip), "capture strip entry says pinned");
 
+// 7b. photo dimensions chosen from the ui are honored: select 4:5, see the
+// framing overlay, capture, and the record carries 1080x1350
+await page.select("#photo-size", "portrait");
+await new Promise((r) => setTimeout(r, 300));
+check("photo framing overlay drawn for 4:5", !!(await page.$("#rec-frame")));
+await page.click("#btn-capture");
+await new Promise((r) => setTimeout(r, 1500));
+const dimPhoto = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem("studiogram_state"));
+  const ph = st.photos && st.photos[st.photos.length - 1];
+  return ph ? { w: ph.width, h: ph.height } : null;
+});
+check("photo records the chosen dimensions (4:5)", !!dimPhoto && dimPhoto.w === 1080 && dimPhoto.h === 1350, JSON.stringify(dimPhoto));
+await page.select("#photo-size", "viewport");
+await new Promise((r) => setTimeout(r, 200));
+
 // 8. a catalog add during pinned mode animates objects, never the view
 const camBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("studiogram_state")).live.position.join(","));
 await page.click('#tabs button[data-tab="jewelry"]');

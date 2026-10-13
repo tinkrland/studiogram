@@ -155,6 +155,16 @@ the open order is the license review (2), then earlobe (6, owner-gated).
    through webcodecs (mediabunny 1.61.3 vendored, mpl-2.0). selftest and
    real-input qa are green. closed.
 
+8. ~~**aspect-aware photo export.~~ done: the `#photo-size` selector
+   beside the capture button gives photos the same dimension presets as
+   video recording (viewport, 1:1, 4:5, 9:16, 16:9); chosen dimensions
+   are recorded per photo and honored by capture, reproduce, and batch
+   export; the framing overlay arms for the photo selector outside takes.
+   the photo whitelist in `serializeState` now carries width/height (and
+   its thumb map lookup was fixed to `.get`, which had silently dropped
+   thumbs from saves). specced in
+   [spec/photo-taking.md](spec/photo-taking.md).
+
 ## deliberately parked: do not pull into this pass
 
 - props. the background prop library with meta sam reconstruction is a

@@ -12,11 +12,33 @@ function sceneCoreState() {
   }));
 }
 
-async function renderPng(size) {
-  const prevMode = S.live.mode;
+// the export dimension library, shared with video recording: presets are
+// prefilled values on the same controls, never a separate rendering path
+const EXPORT_SIZES = {
+  viewport: { label: "viewport" },
+  square: { label: "1:1 · 1080", width: 1080, height: 1080 },
+  portrait: { label: "4:5 · 1080x1350", width: 1080, height: 1350 },
+  vertical: { label: "9:16 · 1080x1920", width: 1080, height: 1920 },
+  wide: { label: "16:9 · 1920x1080", width: 1920, height: 1080 },
+};
+function chosenDims(selectEl) {
+  const preset = EXPORT_SIZES[$(selectEl).value] || EXPORT_SIZES.viewport;
+  if (preset.width) return { width: preset.width, height: preset.height };
+  const canvas = renderer.domElement;
+  return {
+    width: canvas.clientWidth - (canvas.clientWidth % 2),
+    height: canvas.clientHeight - (canvas.clientHeight % 2),
+  };
+}
+function photoDims(photo) {
+  // a photo's dimensions are part of its recorded truth; photos from before
+  // this pass exported square, so that stays their fallback
+  return { width: photo.width || 1600, height: photo.height || 1600 };
+}
+async function renderPng(width, height) {
   renderer.setPixelRatio(1);
-  renderer.setSize(size, size, false);
-  camera.aspect = 1; pinnedHelper.aspect = 1;
+  renderer.setSize(width, height, false);
+  camera.aspect = width / height; pinnedHelper.aspect = width / height;
   renderFrame();
   const url = renderer.domElement.toDataURL("image/png");
   resize();
@@ -65,12 +87,13 @@ async function captureFrame() {
     : { mode: "orbit", name: null, position: [...S.live.position], target: [...S.live.target], fov: S.live.fov, focallength: S.live.focallength, focaldistance: S.live.focaldistance };
   const snapshot = sceneCoreState();
   const state_hash = await sha256hex(snapshot);
-  const png = await renderPng(1600);
+  const dims = chosenDims("#photo-size"); // the dimensions chosen before the capture are the photo's truth
+  const png = await renderPng(dims.width, dims.height);
   const thumb = await makeThumb(png);
   const id = "c" + Math.random().toString(36).slice(2, 9);
   const set = activeSet();
   const name = `capture ${String((set.photo_ids || []).length + 1).padStart(2, "0")}`;
-  const photo = { id, name, camera: cameraState, created_utc: nowUtc(), state_hash, snapshot, gate: gateRecordAtTake() };
+  const photo = { id, name, camera: cameraState, created_utc: nowUtc(), state_hash, snapshot, gate: gateRecordAtTake(), width: dims.width, height: dims.height };
   S.photos.push(photo);
   set.photo_ids.push(id);
   CAPTURE_IMG.set(id, png);
@@ -84,7 +107,8 @@ async function reproduceCapture(photo) {
   if (!photo.snapshot) { toast("this photo predates full snapshots"); return; }
   const prev = sceneCoreState();
   await applyCoreState(photo.snapshot);
-  const png = await renderPng(1600);
+  const dims = photoDims(photo);
+  const png = await renderPng(dims.width, dims.height);
   CAPTURE_IMG.set(photo.id, png);
   CAPTURE_THUMBS.set(photo.id, await makeThumb(png));
   await applyCoreState(prev);
@@ -123,7 +147,8 @@ async function reproduceActiveSet() {
   for (const photo of photos) {
     if (!photo.snapshot) continue;
     await applyCoreState(photo.snapshot);
-    const png = await renderPng(1600);
+    const dims = photoDims(photo);
+    const png = await renderPng(dims.width, dims.height);
     CAPTURE_IMG.set(photo.id, png);
     CAPTURE_THUMBS.set(photo.id, await makeThumb(png));
   }
@@ -138,7 +163,7 @@ function showCaptureModal(photo) {
   img.src = CAPTURE_IMG.get(photo.id) || CAPTURE_THUMBS.get(photo.id) || "";
   const cam = photo.camera;
   modal.querySelector(".capmodal-meta").textContent =
-    `${photo.name} · ${cam.mode}${cam.name ? " · camera " + cam.name : ""} · state sha-256 ${photo.state_hash.slice(0, 16)}… · ${photo.created_utc}` +
+    `${photo.name} · ${cam.mode}${cam.name ? " · camera " + cam.name : ""} · ${photoDims(photo).width}x${photoDims(photo).height} · state sha-256 ${photo.state_hash.slice(0, 16)}… · ${photo.created_utc}` +
     (photo.gate && photo.gate.length ? ` · ${photo.gate.length} verified release${photo.gate.length === 1 ? "" : "s"}` : "");
   modal.style.display = "flex";
 }
@@ -200,7 +225,7 @@ function renderCaptureStrip() {
     nameInp.type = "text"; nameInp.className = "cc-name"; nameInp.value = photo.name;
     nameInp.addEventListener("change", () => { photo.name = nameInp.value || photo.name; saveState(); });
     body.appendChild(nameInp);
-    body.appendChild(el("div", "cc-meta", `${photo.camera.mode}${photo.camera.name ? " · " + photo.camera.name : ""} · ${photo.created_utc} · state ${photo.state_hash.slice(0, 8)}`));
+    body.appendChild(el("div", "cc-meta", `${photo.camera.mode}${photo.camera.name ? " · " + photo.camera.name : ""} · ${photoDims(photo).width}x${photoDims(photo).height} · ${photo.created_utc} · state ${photo.state_hash.slice(0, 8)}`));
     const actions = el("div", "cc-actions");
     const mk = (label, fn, cls) => { const b = el("button", cls || "btn mini", label); b.addEventListener("click", fn); return b; };
     actions.append(

@@ -9,15 +9,10 @@
 // the recording's dimensions are chosen up front (viewport or a platform
 // aspect); every export re-renders the record through webcodecs into mp4,
 // mov, or webm, so the same record exports to the same bytes forever.
+// the dimension presets are shared with photo export: EXPORT_SIZES in
+// socmed-integration/95-captures.js, which loads first
 const VIDEO_FPS = 30;
 const VIDEO_MAX_MS = 30000;
-const REC_SIZES = {
-  viewport: { label: "viewport" },
-  square: { label: "1:1 · 1080", width: 1080, height: 1080 },
-  portrait: { label: "4:5 · 1080x1350", width: 1080, height: 1350 },
-  vertical: { label: "9:16 · 1080x1920", width: 1080, height: 1920 },
-  wide: { label: "16:9 · 1920x1080", width: 1920, height: 1080 },
-};
 const RECORD_TAKES = new Map();  // recording id -> live take object url (memory only, never state)
 let REC = null;                   // the active take
 let VIEW_LOCKED = false;          // export and replay own the canvas while locked
@@ -33,10 +28,8 @@ function startRecording() {
   }
   settleSlides(); // the take starts from the committed state, never a mid-slide view
   const sizeKey = $("#rec-size").value || "viewport";
-  const preset = REC_SIZES[sizeKey];
-  const canvas = renderer.domElement;
-  const width = preset.width || (canvas.clientWidth - (canvas.clientWidth % 2));
-  const height = preset.height || (canvas.clientHeight - (canvas.clientHeight % 2));
+  const dims = chosenDims("#rec-size");
+  const width = dims.width, height = dims.height;
   REC = {
     t0: performance.now(),
     samples: [],
@@ -99,19 +92,25 @@ function updateRecordUi(msLeft) {
 }
 
 // the framing overlay shows what the chosen dimensions see, so a portrait
-// take can be composed while recording into it.
+// take or photo can be composed while recording into it. during a take the
+// recording's dimensions rule the overlay; otherwise it arms for the photo
+// selector, and clears entirely when the live viewport is what exports.
 function showRecFrameOverlay() {
   const vp = $("#viewport");
   let ov = document.getElementById("rec-frame");
-  if (!REC || REC.sizeKey === "viewport") { if (ov) ov.remove(); return; }
+  const frame = REC
+    ? { w: REC.width, h: REC.height, on: REC.sizeKey !== "viewport" }
+    : ($("#photo-size").value !== "viewport" ? chosenDims("#photo-size") : null);
+  if (!frame) { if (ov) ov.remove(); return; }
   if (!ov) { ov = document.createElement("div"); ov.id = "rec-frame"; vp.appendChild(ov); }
   const vw = vp.clientWidth, vh = vp.clientHeight;
-  const ar = REC.width / REC.height;
+  const ar = frame.w / frame.h;
   let w = vw * 0.92, h = w / ar;
   if (h > vh * 0.92) { h = vh * 0.92; w = h * ar; }
   ov.style.width = w + "px";
   ov.style.height = h + "px";
 }
+$("#photo-size").addEventListener("change", showRecFrameOverlay);
 
 // resample the live samples onto the fixed export grid: one path entry per
 // exported frame, camera values lerped between the bracketing live samples,
