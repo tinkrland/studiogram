@@ -24,7 +24,9 @@ Deno.serve(async (req) => {
   const appSecret = Deno.env.get("STUDIOGRAM_META_APP_SECRET") || "";
   if (!appId || !appSecret) return close({ ok: false, reason: "the instagram app is not configured (missing secrets)" });
 
-  const redirectUri = `${u.origin}/functions/studioOauthCallback`;
+  // the exchange's redirect_uri must match the one the authorize dialog
+  // used: the canonical public host, never the internal dispatcher origin
+  const redirectUri = "https://superagent-9bbbac66.base44.app/functions/studioOauthCallback";
   const body = new URLSearchParams({
     client_id: appId, client_secret: appSecret, grant_type: "authorization_code",
     redirect_uri: redirectUri, code,
@@ -36,7 +38,8 @@ Deno.serve(async (req) => {
   });
   const tok = await tokRes.json();
   if (!tokRes.ok || !tok.access_token) {
-    return close({ ok: false, reason: "token exchange failed: " + (tok.error_message || tok.error || "unknown error") });
+    const detail = tok.error_message || tok.error?.error_message || tok.error || "unknown error";
+    return close({ ok: false, reason: "token exchange failed: " + (typeof detail === "string" ? detail : JSON.stringify(detail)) });
   }
   const meRes = await fetch(`https://graph.instagram.com/v26.0/me?fields=user_id,username&access_token=${tok.access_token}`);
   const me = await meRes.json();
