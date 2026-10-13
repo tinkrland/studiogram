@@ -53,3 +53,13 @@ tracking and an accurate catalog. the studio side of that is already
 planned - the feed builders (commerce branch) and the pixel
 content-id rule (tag id equals feed sku) exist precisely so the
 purchase event can match the catalog row.
+
+## the tagging split, pinned (2026-10-13)
+
+re-verified against meta's own content publishing guide (updated
+june 30, 2026): the limitations section states "shopping tags are
+not supported". so the split is exact - instagram allows up to 20
+product tags per post/reel/story for a human in the app, checkout
+runs on the site since native checkout ended, and the api publishes
+jpegs/carousels but can never place the tag. the publish glue's
+per-photo tag handoff list is the bridge across that split.

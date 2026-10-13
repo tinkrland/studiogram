@@ -14,6 +14,19 @@ plus us buyers who shop on the platform, and adds marketplace.
   the same catalog
 - the pdp conversion surface is the same site either way
 
+## the api tagging state (verified 2026-10-13)
+
+in-app, page posts and photos can still tag catalog products - the
+composer in meta business suite does it, checkout lands on the site.
+but the api cannot: the v26.0 page photos reference carries no
+product_tags parameter anymore (older graph versions had one; it was
+removed as meta sunsetted the shops api surface), and the feed/edges
+surfaces only publish plain posts. the remaining api path that shows
+products is the marketing api: dynamic/advantage+ catalog ads, which
+is paid placement, feed-driven, checkout on the site. so facebook is
+instagram's exact shape: tag by human in-app, checkout on the pdp,
+api publishes but never tags.
+
 ## studio inputs
 
 - feed image: 4:5, 1080x1350, max 30 mb; video 4 gb
