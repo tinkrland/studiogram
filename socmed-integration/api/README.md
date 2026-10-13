@@ -24,6 +24,13 @@ x and tumblr have no product api and no catalog: [the research
 dossiers](../../social-commerce-integration.md) already record them as
 link-out only.
 
+the publish side has its own pass now (2026-10-13): instagram's glue
+is built ([the publish spec](../../spec/social-commerce-publish.md));
+tiktok posts photos but only from a verified url prefix behind a
+client audit; pinterest posts multi-image pins and is the one
+platform whose api sets product tags. per-platform publish details in
+the last two dossiers above.
+
 the pattern that matters for kirosculp: on four of five platforms the
 product api is a **feed ingestor** around a csv/tsv/xml file the
 merchant hosts, and the studio's csv export already speaks that
@@ -45,3 +52,9 @@ per-platform details:
 - [tiktok-shop-api.md](tiktok-shop-api.md) - oauth + shop cipher,
   product module, the 2026 gateway enforcement, the mto conflict in
   api terms
+- [tiktok-content-posting-api.md](tiktok-content-posting-api.md) -
+  the content posting api's photo mode (2026-08 docs): url ownership
+  wall, client audit wall, no api tagging
+- [pinterest-pins-api.md](pinterest-pins-api.md) - pin create,
+  multi-image pins, api product tagging (1-24 catalog product pins),
+  the trial/standard tiers

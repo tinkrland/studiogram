@@ -78,6 +78,27 @@ a publish bar renders under the commerce bar in the capture strip:
 3. photos without verified listing bindings publish too (untagged);
    the result marks them, they are never blocked
 
+## next platforms, verified contracts
+
+the instagram glue is the template; the two other candidate platforms
+now have verified publish contracts in
+[../socmed-integration/api/](../socmed-integration/api/) (checked
+2026-10-13):
+
+- **pinterest** first. its v5 api posts multi-image pins (one pin per
+  capture set, per-photo links to the listing pdps) and uniquely can
+  tag products through the api (up to 24 catalog product pins onto the
+  hero pin), so the in-app-tagging handoff instagram forces does not
+  exist there. the only gate is the standard-access video review,
+  which is a recording of the connect flow this glue already provides
+- **tiktok** second. its content posting api gained photo support
+  (2026-08 docs) but photos must be pulled from a verified url
+  prefix/domain, and the studio's photo host is platform dns the
+  owner cannot sign. production tiktok posting needs photo hosting on
+  an owner-controlled domain plus the tiktok client audit before
+  anything posts public; inbox-upload mode is the honest testing path
+  until then
+
 ## multi-user by design
 
 the glue is for the studio's users, not one owner account. every user
