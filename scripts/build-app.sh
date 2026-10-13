@@ -22,6 +22,7 @@ manifest = [
     "socmed-integration/95-captures.js",
     "socmed-integration/96-commerce.js",
     "socmed-integration/97-video.js",
+    "socmed-integration/98-publish.js",
     "core/96-state-io.js", "core/98-boot.js", "core/99-qa.js",
 ]
 js = "".join((root / p).read_text() for p in manifest)

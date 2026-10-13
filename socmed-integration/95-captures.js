@@ -241,6 +241,7 @@ function renderCaptureStrip() {
   });
   strip.appendChild(stripRow);
   renderCommerceBar();
+  renderPublishBar();
 }
 function moveCapture(i, dir) {
   const set = activeSet();

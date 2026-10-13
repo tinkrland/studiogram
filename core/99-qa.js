@@ -165,6 +165,7 @@ async function runSelfTest() {
   const g1 = feedCSV("google"), g2 = feedCSV("google");
   results.push("google feed deterministic: " + (g1 === g2) + ", listing rows: " + (g1.trim().split("\n").length - 1));
   results.push("google feed mpn is the release id: " + g1.includes(rel0.release_id) + ", identifier_exists false: " + g1.includes("false") + ", quantity override: " + /,1$/.test(g1.trim().split("\n").pop()));
+  results.push("publish caption composed, never authored: " + (composeCaption(["Ring Two"], "https://x/r") === "new: ring two. https://x/r") + ", 2200 cap: " + (composeCaption([Array(2600).join("x")], "").length === 2200));
   const drift = await importListingManifest({ schema: "sculptura-listing-manifest", manifest_version: 1,
     listings: [{ release_id: rel0.release_id, version: rel0.version, mesh_sha256: "deadbeef", sku: "DRIFT", title: "t", price: 1, pdp_url: "u" }] });
   results.push("drifted listing (wrong mesh hash) refused: " + (drift.accepted === 0 && drift.refused.length === 1));
