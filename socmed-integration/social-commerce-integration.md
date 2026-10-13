@@ -43,6 +43,14 @@ practical reading: the website product page is the conversion surface on
 three of the four tagging platforms. catalog quality and pdp speed
 matter more than any platform storefront setup.
 
+per-platform dossiers live in the sibling folders:
+[shopping-hub/](shopping-hub/), [tiktok-shopping/](tiktok-shopping/),
+[instagram-shopping/](instagram-shopping/),
+[pinterest-shopping/](pinterest-shopping/),
+[facebook-shopping/](facebook-shopping/),
+[youtube-shopping/](youtube-shopping/), [x-shopping/](x-shopping/),
+[tumblr-shopping/](tumblr-shopping/).
+
 ## the binding: the release hash is the product identity
 
 the studio-platform interface is the design release: a versioned,

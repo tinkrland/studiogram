@@ -55,6 +55,14 @@ socmed-integration/   creator outputs
   platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
   social-commerce-reference.md  full photo+video dimension matrix and commerce state, social-commerce branch
   social-commerce-integration.md  tagging-to-checkout mechanics and mto feed risks, social-commerce branch
+  shopping-hub/         catalog, pdp, and feed backbone, social-commerce branch
+  tiktok-shopping/       the only in-app checkout; mto options conflict
+  instagram-shopping/   20 tags, link-out, carousel-first
+  pinterest-shopping/   catalog feed, 24 tags, 2:3 pins
+  facebook-shopping/    shared meta catalog, marketplace
+  youtube-shopping/     merchant tags on shorts, affiliate route
+  x-shopping/           no commerce surface; link-out only
+  tumblr-shopping/      no commerce native; affiliate with disclosure
 
 core/                 the spine
   01-head.html          html shell
