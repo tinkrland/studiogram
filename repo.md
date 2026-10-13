@@ -54,6 +54,7 @@ socmed-integration/   creator outputs
   95-captures.js        capture set: frame, reproduce, strip, png export
   platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
   social-commerce-reference.md  full photo+video dimension matrix and commerce state, social-commerce branch
+  social-commerce-integration.md  tagging-to-checkout mechanics and mto feed risks, social-commerce branch
 
 core/                 the spine
   01-head.html          html shell
