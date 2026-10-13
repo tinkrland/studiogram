@@ -3756,8 +3756,8 @@ $("#vidmodal").addEventListener("click", () => {
 });
 window.addEventListener("resize", () => { if (REC) showRecFrameOverlay(); });
 // ===== the publish glue: post a capture set, listings attached =====
-// spec: [../spec/social-commerce-publish.md]. the creator connects the
-// instagram account once (the oauth exchange happens in the backend
+// spec: [../spec/social-commerce-publish.md]. each user connects their
+// own instagram account (the oauth exchange happens in the backend
 // function; the artifact never sees the app secret, and the token
 // lives in sessionStorage for the tab session only), then publishes
 // the active set as a carousel with the listing bindings attached.
@@ -3886,7 +3886,7 @@ async function publishSetToInstagram() {
   try {
     const res = await fetch(PUBLISH_BASE + "/studioPublishCarousel", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ access_token: conn.access_token, ig_id: conn.ig_id, set_name: set.name, caption, children }),
+      body: JSON.stringify({ access_token: conn.access_token, ig_id: conn.ig_id, username: conn.username, set_name: set.name, caption, children }),
     }).then((r) => r.json());
     if (res.ok) {
       PUBLISH_RESULT = { set: set.name, permalink: res.permalink, tags: tagSummary(children), at: nowUtc() };

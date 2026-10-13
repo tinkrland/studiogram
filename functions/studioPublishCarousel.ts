@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     }
     await base44.asServiceRole.entities.StudioPublishedSet.create({
       set_name: set,
+      connected_username: String(body.username || ""),
       caption,
       permalink,
       post_id: String(published.id || ""),

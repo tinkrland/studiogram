@@ -78,16 +78,25 @@ a publish bar renders under the commerce bar in the capture strip:
 3. photos without verified listing bindings publish too (untagged);
    the result marks them, they are never blocked
 
-## owner setup (the one manual dependency)
+## multi-user by design
+
+the glue is for the studio's users, not one owner account. every user
+connects their own instagram professional account through the oauth
+flow, their token lives in their tab session only, and the publish
+record stores their connected handle for attribution. the meta app is
+a one-time developer setup, the standard saas shape.
+
+## owner setup (the one-time developer dependency)
 
 1. create a meta app at developers.facebook.com, add the instagram
    product with **instagram login** (business login for instagram)
 2. add the redirect uri: `<app-origin>/functions/studioOauthCallback`
 3. set the secrets `STUDIOGRAM_META_APP_ID` and
-   `STUDIOGRAM_META_APP_SECRET` (requested alongside this spec)
+   `STUDIOGRAM_META_APP_SECRET` (requested alongside this spec). these
+   are the app's own credentials, not any user's account
 4. app review for `instagram_business_content_publish` in advanced
-   access before a non-developer account can publish; until then,
-   accounts with a role on the app can test
+   access is what lets users outside the app's roles oauth and publish;
+   until it clears, accounts with a role on the app can test
 
 ## verification
 
