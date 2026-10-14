@@ -84,6 +84,31 @@ the checkout map does not move: in-app only on tiktok shop and
 xiaohongshu (through the cross-border door), everything else links
 to the pdp.
 
+## the creator-commerce extension (checked 2026-10-14)
+
+the owner asked for ltk and the rest of the creator-affiliate layer;
+dossiers live in the per-platform folders. one line each:
+
+- **ltk**: the largest independent affiliate rail (~$4b annual
+  creator-driven sales), brand door is paid (~$12k/yr self-serve) -
+  a sponsor-creators channel, not a self-serve door
+- **shopmy**: creator storefronts, brand-set 10-30 percent
+  commissions, weekly payouts, no five-figure brand door - the first
+  creator-commerce door and mto-compatible (the link lands on the
+  studio pdp)
+- **amazon storefronts**: the april 14 2026 associates update opened
+  storefronts and onsite earning to all associates (onsite 1-3
+  percent vs offsite 4 percent fashion); rides entirely on the
+  list-on-amazon decision, which carries the mto conflict
+- **whatnot**: live auction selling with in-app checkout (8 percent
+  commission plus processing, ~12 percent all-in; 0 percent above
+  $1,500 in select categories since january 2026); needs in-stock
+  inventory and a live host
+
+one checkout-map correction: whatnot does carry in-app checkout, so
+the in-app list becomes tiktok shop, xiaohongshu (cross-border door),
+and whatnot. everything else still links to the pdp.
+
 ## the binding: the release hash is the product identity
 
 the studio-platform interface is the design release: a versioned,
