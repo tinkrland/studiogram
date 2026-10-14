@@ -59,6 +59,20 @@ mods = {
     "__BUFFERGEOMETRYUTILS_B64__": b64(vendor / "BufferGeometryUtils.js"),
 }
 head = (root / "core/01-head.html").read_text()
+def fontface(path, family, style, weight):
+    import base64
+    data = base64.b64encode((root / path).read_bytes()).decode()
+    return (
+        f"@font-face {{ font-family: '{family}'; font-style: {style}; font-weight: {weight}; "
+        f"src: url(data:font/woff2;base64,{data}) format('woff2'); }}"
+    )
+fonts = "\n  ".join([
+    fontface("assets/fonts/karla-normal-variable.woff2", "Karla", "normal", "200 800"),
+    fontface("assets/fonts/karla-italic-variable.woff2", "Karla", "italic", "200 800"),
+    fontface("assets/fonts/instrumentserif-normal-400.woff2", "Instrument Serif", "normal", "400"),
+    fontface("assets/fonts/instrumentserif-italic-400.woff2", "Instrument Serif", "italic", "400"),
+])
+head = head.replace("/*__FONTS__*/", fonts)
 for k, v in mods.items(): head = head.replace(k, v)
 pathlib.Path("artifact/index.html").write_text(head + js + "\n</script>\n</body>\n</html>\n")
 pathlib.Path("artifact/app.mjs").write_text(js)

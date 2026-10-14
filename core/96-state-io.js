@@ -86,6 +86,14 @@ $("#btn-reset-scene").addEventListener("click", () => {
   (async () => { await applyFullState(S, { fresh: true }); toast("scene reset to a clean subject"); })();
 });
 $("#btn-export-state").addEventListener("click", exportSceneState);
+// theme: light first, dark as an opt-in. a ui preference, not scene state.
+$("#btn-theme").addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("sgtheme", next); } catch (e) {}
+  $("#btn-theme").textContent = "theme: " + next;
+});
+$("#btn-theme").textContent = "theme: " + (document.documentElement.dataset.theme || "light");
 $("#btn-export-caps").addEventListener("click", exportCaptureSet);
 $("#btn-batch-repro").addEventListener("click", reproduceActiveSet);
 $("#btn-capture").addEventListener("click", captureFrame);

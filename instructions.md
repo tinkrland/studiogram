@@ -37,6 +37,12 @@ invariants, which this build must keep:
   author credit "rigged hand" by DennisH2010 where the license requires
   attribution fidelity, and `README.md`/`repo.md` by established repo
   convention.
+- ui: light theme first (dark is an opt-in via the theme button, a
+  browser preference, not scene state). karla (variable, 200-800) is the
+  sans voice, instrument serif is the display voice (wordmark, section
+  titles); both OFL, vendored in assets/fonts with their licenses and
+  embedded by the build. the ui speaks lowercase only via a body-wide
+  text transform; state keeps its own case.
 - commit messages: a lowercase subject of about 50 characters stating the
   one idea, with reasoning and verification notes in the body.
 - the build is the verification. `scripts/build-app.sh` concatenates the
