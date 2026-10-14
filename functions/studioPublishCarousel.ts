@@ -12,6 +12,20 @@ const IG = "https://graph.instagram.com/v26.0";
 const captionFor = (c) => c.slice(0, 2200);
 
 Deno.serve(async (req) => {
+  // the cors preflight: the studio page fetches cross-origin with a
+  // json body, so browsers send an options check first; answer it or
+  // every real post dies before reaching this function.
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "content-type,range,authorization",
+        "access-control-allow-methods": "GET,POST,HEAD,OPTIONS",
+        "access-control-max-age": "86400",
+      },
+    });
+  }
   const base44 = createClientFromRequest(req);
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "post the publish payload" }), {

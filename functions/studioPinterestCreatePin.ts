@@ -13,6 +13,20 @@ import { createClientFromRequest } from "npm:@base44/sdk@0.8.31";
 const clamp = (s, n) => String(s || "").slice(0, n);
 
 Deno.serve(async (req) => {
+  // the cors preflight: the studio page fetches cross-origin with a
+  // json body, so browsers send an options check first; answer it or
+  // every real post dies before reaching this function.
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "content-type,range,authorization",
+        "access-control-allow-methods": "GET,POST,HEAD,OPTIONS",
+        "access-control-max-age": "86400",
+      },
+    });
+  }
   const base44 = createClientFromRequest(req);
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "post the pin payload" }), {

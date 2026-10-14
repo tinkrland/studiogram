@@ -6,6 +6,20 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.31";
 
 Deno.serve(async (req) => {
+  // the cors preflight: the studio page fetches cross-origin with a
+  // json body, so browsers send an options check first; answer it or
+  // every real post dies before reaching this function.
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "content-type,range,authorization",
+        "access-control-allow-methods": "GET,POST,HEAD,OPTIONS",
+        "access-control-max-age": "86400",
+      },
+    });
+  }
   const id = new URL(req.url).searchParams.get("id");
   if (!id) {
     return new Response(JSON.stringify({ error: "photo id required" }), {

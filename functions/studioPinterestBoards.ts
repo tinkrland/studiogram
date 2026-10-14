@@ -4,6 +4,20 @@
 // contract: get /boards, page_size up to 250, bookmark cursor.
 // spec: spec/social-commerce-publish.md
 Deno.serve(async (req) => {
+  // the cors preflight: the studio page fetches cross-origin with a
+  // json body, so browsers send an options check first; answer it or
+  // every real post dies before reaching this function.
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "content-type,range,authorization",
+        "access-control-allow-methods": "GET,POST,HEAD,OPTIONS",
+        "access-control-max-age": "86400",
+      },
+    });
+  }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "post the access token" }), {
       status: 405, headers: { "content-type": "application/json" },

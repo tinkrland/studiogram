@@ -24,6 +24,7 @@ manifest = [
     "socmed-integration/97-video.js",
     "socmed-integration/98-publish.js",
     "socmed-integration/98b-tag-stage.js",
+    "socmed-integration/98c-video-share.js",
     "socmed-integration/99-pinterest.js",
     "core/96-state-io.js", "core/98-boot.js", "core/99-qa.js",
 ]

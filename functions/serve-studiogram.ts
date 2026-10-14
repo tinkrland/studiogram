@@ -2,7 +2,7 @@
 // the app itself is a single deterministic html file uploaded to public storage;
 // this endpoint only sets the correct content type so browsers render it.
 const PAGE_URL =
-  "https://base44.app/api/apps/6ac24e708f39fb029bbbac66/files/mp/public/6ac24e708f39fb029bbbac66/3953c9170_index.html";
+  "https://base44.app/api/apps/6ac24e708f39fb029bbbac66/files/mp/public/6ac24e708f39fb029bbbac66/11137f4a3_index.html";
 
 Deno.serve(async (req) => {
   const upstream = await fetch(PAGE_URL, { cache: "no-store" });
@@ -18,6 +18,13 @@ Deno.serve(async (req) => {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
+      // the edge injects script-src 'none' unless the response carries
+      // its own policy; the artifact is one inline script, so allow it
+      "content-security-policy":
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; " +
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+        "media-src 'self' blob: https:; connect-src 'self' https:; " +
+        "font-src 'self' data:; worker-src blob:; frame-ancestors 'none'",
     },
   });
 });

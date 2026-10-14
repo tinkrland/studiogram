@@ -473,7 +473,7 @@ async function runSceneAudit() {
   if (location.hash.includes("audit")) setTimeout(runSceneAudit, 9000);
   // qa handle: the visual check scripts (scripts/nail-sheet.mjs) reach the
   // module-scoped scene through this, only when the url asks for it
-  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER };
+  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER, startRecording, stopRecording, renderVideoBuffer, exportVideo, S_Rec: () => S.recordings };
   renderCaptureStrip();
   updateVpOverlay();
   syncModeBadge();
