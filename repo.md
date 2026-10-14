@@ -51,6 +51,7 @@ setdesign/            scene composition
   92-scene-panel.js     the scene tab
 
 socmed-integration/   creator outputs
+visual-curation-research/   visual data curation and style analysis research: the platform corpora studies (instagram, tiktok, pinterest, youtube, x) and the style analysis that feeds the integration docs and export decisions
   95-captures.js        capture set: frame, reproduce, strip, png export
   platform-reference.md export dimensions and shopping surfaces, checked 2026-10-12
   social-commerce-reference.md  full photo+video dimension matrix and commerce state, social-commerce branch
