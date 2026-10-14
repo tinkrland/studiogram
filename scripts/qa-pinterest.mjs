@@ -11,7 +11,8 @@ const fns = {
   pin: readFileSync(root + "functions/studioPinterestCreatePin.ts", "utf8"),
   tags: readFileSync(root + "functions/studioPinterestProductTags.ts", "utf8"),
 };
-const ig98 = readFileSync(root + "socmed-integration/98-publish.js", "utf8");
+const ig98 = readFileSync(root + "socmed-integration/98-publish.js", "utf8") +
+  readFileSync(root + "socmed-integration/98a-connect-handoff.js", "utf8");
 const manifest = readFileSync(root + "scripts/build-app.sh", "utf8");
 const captures = readFileSync(root + "socmed-integration/95-captures.js", "utf8");
 

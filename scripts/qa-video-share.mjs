@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const source = readFileSync(join(root, "socmed-integration/98c-video-share.js"), "utf8");
+const source = readFileSync(join(root, "socmed-integration/98a-connect-handoff.js"), "utf8") +
+  readFileSync(join(root, "socmed-integration/98c-video-share.js"), "utf8");
 const fails = [];
 const check = (name, ok, detail = "") => {
   console.log((ok ? "PASS " : "FAIL ") + name + (detail ? " — " + detail : ""));
@@ -33,6 +34,7 @@ const mkSandbox = () => {
   let row = null;
   const sandbox = {
     atob, btoa,
+    setTimeout: () => {}, // the connect poll loop defers; no-op by default
     sessionStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) },
     window: { addEventListener: (n, fn) => listeners.push(fn), open: (url, name) => { calls.opens.push(url); return {}; } },
     navigator: { clipboard: { writeText: () => {} } },
@@ -144,7 +146,41 @@ const load = (sandbox) => vm.runInNewContext(
   const sb = mkSandbox(); const api = load(sb);
   sb.fetch = async () => ({ ok: true, json: async () => ({ configured: true, authorize_url: "https://api.vimeo.com/oauth/authorize?response_type=code" }) });
   await api.connectVimeo();
-  check("configured app opens the authorize dialog", sb.__calls.opens[0] && sb.__calls.opens[0].includes("response_type=code"));
+  check("configured app opens the authorize dialog with the state code",
+    sb.__calls.opens[0] && sb.__calls.opens[0].includes("response_type=code") && /state=conn-vimeo-[a-z0-9]+/.test(sb.__calls.opens[0]));
+}
+{
+  // the poll handoff: waiting once, then the stored connection lands
+  // and applies exactly like the old postMessage path did
+  const sb = mkSandbox(); const api = load(sb);
+  sb.setTimeout = (fn) => fn(); // run the poll loop synchronously
+  let polls = 0;
+  sb.fetch = async (url) => ({
+    ok: true,
+    json: async () => url.includes("studioConnPoll")
+      ? (++polls === 1 ? { waiting: true } : { ok: true, handoff: { ok: true, token: "vh-1", name: "studio vimeo", link: "https://vimeo.com/studio" } })
+      : { configured: true, authorize_url: "https://api.vimeo.com/oauth/authorize?response_type=code" },
+  });
+  await api.connectVimeo();
+  for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r)); // let the poll chain settle
+  check("the connect handoff polls until the token lands",
+    polls === 2 && api.conn() && api.conn().token === "vh-1" && sb.sessionStorage.getItem("studiogram-vimeo-conn").includes("vh-1"),
+    "polls " + polls);
+  check("a landed handoff toasts the connection", sb.__calls.toasts.some((t) => /vimeo connected: studio vimeo/.test(t)));
+}
+{
+  // a refused authorize also travels the handoff, not just postMessage
+  const sb = mkSandbox(); const api = load(sb);
+  sb.setTimeout = (fn) => fn();
+  sb.fetch = async (url) => ({
+    ok: true,
+    json: async () => url.includes("studioConnPoll")
+      ? { ok: true, handoff: { ok: false, reason: "authorize refused: access denied" } }
+      : { configured: true, authorize_url: "https://api.vimeo.com/oauth/authorize?response_type=code" },
+  });
+  await api.connectVimeo();
+  for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r));
+  check("a refused connect surfaces the reason through the handoff", sb.__calls.toasts.some((t) => /refused: access denied/.test(t)));
 }
 
 // vimeo push: privacy fallback chain, tus headers, share recorded

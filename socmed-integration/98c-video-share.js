@@ -70,7 +70,11 @@ async function shareVideoLink(rec) {
 async function connectVimeo() {
   const cfg = await (await fetch(SHARE_HOST + "/functions/studioVimeoConfig")).json().catch(() => null);
   if (!cfg || !cfg.configured) throw new Error("the vimeo app is not configured yet (owner secrets)");
-  window.open(cfg.authorize_url, "studiogram-vimeo", "width=560,height=720");
+  connectHandoff("vimeo", cfg.authorize_url, (h) => {
+    VIMEO_CONN = { token: h.token, name: h.name, link: h.link };
+    sessionStorage.setItem("studiogram-vimeo-conn", JSON.stringify(VIMEO_CONN));
+    toast("vimeo connected: " + h.name);
+  });
 }
 
 window.addEventListener("message", (ev) => {

@@ -56,12 +56,16 @@ function tagSummary(children) {
 
 // the connect half: the backend holds the app secret and exchanges the
 // code; the popup postMessages the connection back to this window.
+
 function connectInstagram() {
   fetch(PUBLISH_BASE + "/studioPublishConfig")
     .then((r) => r.json())
     .then((cfg) => {
       if (!cfg.configured) { toast("instagram publishing is not configured yet: the app secrets are missing"); return; }
-      window.open(cfg.authorize_url, "studiogram-ig", "width=480,height=720");
+      connectHandoff("instagram", cfg.authorize_url, (h) => {
+        igConnSave({ access_token: h.access_token, ig_id: h.ig_id, username: h.username });
+        toast("instagram connected" + (h.username ? " as @" + h.username : ""));
+      });
     })
     .catch(() => toast("could not reach the publish backend"));
 }

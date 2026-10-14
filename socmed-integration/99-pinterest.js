@@ -29,7 +29,11 @@ function connectPinterest() {
     .then((r) => r.json())
     .then((cfg) => {
       if (!cfg.configured) { toast("pinterest publishing is not configured yet: the app secrets are missing"); return; }
-      window.open(cfg.authorize_url, "studiogram-pinterest", "width=520,height=720");
+      connectHandoff("pinterest", cfg.authorize_url, (h) => {
+        pinConnSave({ access_token: h.access_token, username: h.username });
+        PIN_BOARDS = null; // refetch for the new connection
+        toast("pinterest connected" + (h.username ? " as " + h.username : ""));
+      });
     })
     .catch(() => toast("could not reach the publish backend"));
 }

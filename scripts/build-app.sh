@@ -23,6 +23,7 @@ manifest = [
     "socmed-integration/96-commerce.js",
     "socmed-integration/97-video.js",
     "socmed-integration/98-publish.js",
+    "socmed-integration/98a-connect-handoff.js",
     "socmed-integration/98b-tag-stage.js",
     "socmed-integration/98c-video-share.js",
     "socmed-integration/99-pinterest.js",

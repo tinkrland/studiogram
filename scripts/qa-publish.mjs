@@ -11,6 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // the publish module plus the tag stage it reads (taggedProducts lives
 // in the stage module; the build concatenates both in this order)
 const source = readFileSync(join(root, "socmed-integration/98-publish.js"), "utf8") +
+  readFileSync(join(root, "socmed-integration/98a-connect-handoff.js"), "utf8") +
   "\n" + readFileSync(join(root, "socmed-integration/98b-tag-stage.js"), "utf8");
 const fails = [];
 const check = (name, ok, detail = "") => {
