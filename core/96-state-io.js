@@ -38,6 +38,8 @@ async function applyFullState(raw, opts = {}) {
     st.environment = { ...b, preset: st.environment.backdrop };
   }
   if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
+  st.subject = st.subject === "bust" ? "bust" : "hand"; // pre-bust saves stay on the hand
+  st.bust = migrateBust(st.bust);
   // photos: pull thumbs into memory, keep the rest as values
   for (const c of st.photos || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }

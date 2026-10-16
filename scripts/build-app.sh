@@ -13,9 +13,10 @@ manifest = [
     "core/43-render-composite.js", "camera/45-camera-modes.js",
     "customized-hands/50-model.js", "customized-hands/52-morphology.js",
     "customized-hands/53-nails.js", "customized-hands/54-surface.js", "customized-hands/56-tattoos.js",
+    "bust/50-bust-model.js", "bust/53-ear-seats.js", "bust/54-necklace.js",
     "dollification/58-finish.js", "posing-studio/60-posing.js",
     "jewelry/70-jewelry.js",
-    "core/80-panel-infra.js", "customized-hands/82-subject-panel.js",
+    "core/80-panel-infra.js", "customized-hands/82-subject-panel.js", "bust/82-bust-panel.js",
     "jewelry/84-jewelry-panel.js", "posing-studio/86-pose-panel.js",
     "camera/88-camera-panel.js", "lighting/90-light-panel.js",
     "setdesign/92-scene-panel.js", "core/93-panel-shell.js",
@@ -27,6 +28,10 @@ js = "".join((root / p).read_text() for p in manifest)
 fixtures = (root / "core/fixtures.json").read_text()
 js = js.replace("const REGISTRY = /*__FIXTURES__*/[];", "const REGISTRY = " + fixtures + ";")
 js = js.replace("/*__POSES__*/{}", (root / "posing-studio/poses.json").read_text().strip())
+earframe = (root / "bust/ear-frame.json").read_text()
+js = js.replace("const EAR_FRAME = /*__EARFRAME__*/{};", "const EAR_FRAME = " + earframe + ";")
+neckrings = (root / "bust/neck-rings.json").read_text()
+js = js.replace("const NECK_RINGS = /*__NECKRINGS__*/{};", "const NECK_RINGS = " + neckrings + ";")
 hair = (root / "customized-hands/hair-region.json").read_text()
 js = js.replace("const HAIR_REGION = /*__HAIRPTS__*/[];", "const HAIR_REGION = " + hair + ";")
 nails = (root / "customized-hands/nail-region.json").read_text()

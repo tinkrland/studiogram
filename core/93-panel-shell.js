@@ -16,9 +16,15 @@ function renderGateEntries() {
 function renderPanel(tab) {
   currentTab = tab;
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-  if (tab === "subject") renderSubjectPanel();
-  else if (tab === "jewelry") renderJewelryPanel();
-  else if (tab === "pose") renderPosePanel();
+  if (tab === "subject") { subjectIsBust() ? renderBustPanel() : renderSubjectPanel(); }
+  else if (tab === "jewelry") {
+    if (subjectIsBust()) { PANEL.innerHTML = ""; hint(section(PANEL, "jewelry"), "jewelry rides the hand's bones. switch the subject in the scene tab."); }
+    else renderJewelryPanel();
+  }
+  else if (tab === "pose") {
+    if (subjectIsBust()) { PANEL.innerHTML = ""; hint(section(PANEL, "pose"), "posing drives the hand's skeleton. switch the subject in the scene tab."); }
+    else renderPosePanel();
+  }
   else if (tab === "camera") renderCameraPanel();
   else if (tab === "light") renderLightPanel();
   else if (tab === "scene") renderScenePanel();

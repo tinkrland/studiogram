@@ -80,6 +80,37 @@ function defaultHand() {
     credit: "Rigged Hand by DennisH2010 (blendswap 66039), CC BY-SA 3.0"
   };
 }
+function defaultBust() {
+  return {
+    tone: { preset: "golden", lightness: 0, warmth: 0, depth: 0 },
+    ear: {
+      lobe: { piece: "stud", metal: "gold_14k_yellow", metalBead: false },
+      helix: { piece: "none", metal: "gold_14k_yellow" },
+      tragus: { piece: "none", metal: "gold_14k_yellow" },
+      conch: { piece: "none", metal: "gold_14k_yellow" }
+    },
+    necklace: { style: "princess", length_cm: 46, metal: "gold_14k_yellow", pendant: true }
+  };
+}
+function migrateBust(b) {
+  const d = defaultBust();
+  if (!b || typeof b !== "object") return d;
+  const out = {
+    tone: { ...d.tone, ...(b.tone || {}), preset: SKIN_PRESETS.some((x) => x.key === (b.tone || {}).preset) ? b.tone.preset : "golden" },
+    ear: { ...d.ear },
+    necklace: { ...d.necklace, ...(b.necklace || {}) }
+  };
+  for (const site of ["lobe", "helix", "tragus", "conch"]) {
+    const src = (b.ear || {})[site] || {};
+    out.ear[site] = { ...d.ear[site], ...src };
+    if (!EAR_PIECE_VALUES.includes(out.ear[site].piece)) out.ear[site].piece = "none";
+    if (!METALS[out.ear[site].metal]) out.ear[site].metal = "gold_14k_yellow";
+  }
+  if (!METALS[out.necklace.metal]) out.necklace.metal = "gold_14k_yellow";
+  if (typeof out.necklace.length_cm !== "number" || out.necklace.length_cm < 30 || out.necklace.length_cm > 65) out.necklace.length_cm = 46;
+  if (!["none", "choker", "princess", "custom"].includes(out.necklace.style)) out.necklace.style = "princess";
+  return out;
+}
 function defaultPose() {
   return {
     preset: "presenting",
@@ -100,7 +131,9 @@ const BACKDROPS = {
 function defaultState() {
   return {
     schema: "studiogram-scene-state", state_version: 2,
+    subject: "hand", // which subject is on stage: hand | bust
     hand: defaultHand(),
+    bust: defaultBust(),
     pose: defaultPose(),
     jewelry: [],
     lighting: defaultLights(),
@@ -115,6 +148,7 @@ function defaultState() {
 }
 let S = defaultState();
 
+const EAR_PIECE_VALUES = ["none", "stud", "hoop", "labret"];
 const METALS = {
   silver_925: { label: "silver 925", color: 0xe6e6ec, rough: 0.13 },
   gold_14k_yellow: { label: "gold 14k", color: 0xe9b95c, rough: 0.17 },

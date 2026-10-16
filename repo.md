@@ -17,6 +17,14 @@ dollification/        the porcelain display-hand finish
   58-finish.js
 
 customized-hands/     the hand as a shapeable subject
+
+bust/                the v2 subject: a sculpted head-and-shoulders bust
+  50-bust-model.js      hash-verified load, tone, subject switching
+  53-ear-seats.js        authored ear anatomy, pierced jewelry seats
+  54-necklace.js         deterministic length-driven necklace drape
+  82-bust-panel.js       the bust's dressing room tab
+  ear-frame.json         authored ear anchors (front/back channel exits)
+  neck-rings.json        resting shells the drape solves against
   50-model.js           glb load, rig binding
   52-morphology.js      authored blend targets
   54-surface.js         tone, hair, nail polish, the texture composite

@@ -282,6 +282,34 @@ async function runSelfTest() {
   await applyFullState(rawNoVid);
   results.push("import tolerates missing recordings: " + (Array.isArray(S.recordings) && S.recordings.length === 0));
 
+  // bust subject: on-demand load, verified hash, deterministic drape
+  if (!BUST.loaded && !BUST.loadError) {
+    await loadBustModel();
+    if (BUST.loaded) { applyBustTone(); buildEarSeats(); buildNecklace(); }
+  }
+  results.push("bust load: " + (BUST.loaded ? "ok" : "failed") + (BUST.loadError ? " (" + BUST.loadError + ")" : ""));
+  if (BUST.loaded) {
+    results.push("bust verts: " + BUST.mesh.geometry.attributes.position.count + ", subject default: " + S.subject);
+    const keepTone = { ...S.bust.tone };
+    S.bust.tone = { preset: "espresso", lightness: 0, warmth: 0, depth: 0 };
+    applyBustTone();
+    results.push("bust tone espresso: " + bustAlbedoHex() + " (expect #724932)");
+    const d1 = solveDrape(46), d2 = solveDrape(46), d3 = solveDrape(40);
+    results.push("drape 46cm sag: " + d1.sag.toFixed(4) + ", deterministic: " + (d1.sag === d2.sag) + ", choker nearly taut: " + (d3.sag < 0.03 && d3.sag < d1.sag));
+    results.push("drape length residual: " + Math.abs(necklaceLength(d1.pts) - 46 / 10.5).toExponential(1) + " glb units");
+    buildNecklace();
+    let links = 0; BUST.chainGroup.traverse((o) => { if (o.isMesh) links++; });
+    let seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
+    results.push("chain meshes at 46cm with pendant: " + links + ", default lobe stud meshes: " + seats + " (post, gem, disc)");
+    S.subject = "bust"; BUST.root.visible = true; if (HAND.root) HAND.root.visible = false;
+    const ser = serializeState(false);
+    results.push("state carries subject+bust: " + (ser.subject === "bust" && ser.bust.tone.preset === "espresso" && ser.bust.necklace.style));
+    const restored = migrateBust(ser.bust);
+    results.push("bust state migrates clean: " + (restored.tone.preset === "espresso" && restored.ear.lobe.piece === "stud"));
+    S.bust.tone = keepTone; applyBustTone();
+    S.subject = "hand"; BUST.root.visible = false; if (HAND.root) HAND.root.visible = true;
+  }
+
   const div = document.createElement("div");
   div.id = "selftest";
   div.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:200;background:#111;color:#9fd99f;padding:12px;font:12px ui-monospace,monospace;white-space:pre;border:1px solid #4a4;";

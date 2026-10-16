@@ -126,6 +126,13 @@ async function applyCoreState(core) {
 // rebuilds every runtime object from state. the state is the truth.
 async function syncSceneToState() {
   await buildHand();
+  if (S.subject === "bust" && !BUST.loaded && !BUST.loadError) {
+    await loadBustModel();
+    if (BUST.loaded) { applyBustTone(); buildEarSeats(); buildNecklace(); }
+  }
+  if (BUST.loaded) BUST.root.visible = S.subject === "bust";
+  if (HAND.root) HAND.root.visible = S.subject === "hand";
+  updateSubjectTabs();
   applyLighting();
   applyEnvironment();
   for (const inst of S.jewelry) await buildJewelryInstance(inst);

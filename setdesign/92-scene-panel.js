@@ -1,6 +1,14 @@
 // ----- scene panel -----
 function renderScenePanel() {
   PANEL.innerHTML = "";
+  const subj = section(PANEL, "subject");
+  hint(subj, "one subject on stage at a time: the rigged hand or the bust. switching reframes the camera; the hand's shape, pose and jewelry stay saved.");
+  const srow = el("div", "btnrow");
+  for (const kind of ["hand", "bust"]) {
+    const b = button(srow, kind, "btn" + (S.subject === kind ? " on" : ""), () => setSubject(kind));
+    b.style.borderColor = S.subject === kind ? "var(--accent)" : "";
+  }
+  subj.appendChild(srow);
   const env = section(PANEL, "environment");
   hint(env, "plain backdrops for the first pass. the curated prop library is a later phase and is not part of this build.");
   const sw = el("div", "swatches");
