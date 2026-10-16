@@ -309,6 +309,21 @@ async function runSelfTest() {
     results.push("nose seats add 4 meshes: " + seats + " (nostril pin post/gem/disc + septum ring)");
     S.bust.nose.nostril.piece = "none"; S.bust.nose.septum.piece = "none";
     S.bust.ear.mirror_left = true; buildPiercings();
+    // hoops thread the channel: the ring's axis must be perpendicular to it
+    S.bust.ear.lobe.piece = "hoop"; buildPiercings();
+    const hoops = [];
+    BUST.seatGroup.children.forEach((g) => g.traverse((o) => { if (o.isMesh && o.geometry.type === "TorusGeometry") hoops.push(o); }));
+    const f = EAR_FRAME.lobe;
+    const dirR = new THREE.Vector3(...f.pos).sub(new THREE.Vector3(...f.back)).normalize();
+    const dirL = dirR.clone().multiply(new THREE.Vector3(-1, 1, 1)); // mirrored channel
+    const down = new THREE.Vector3(0, -1, 0);
+    // each hoop's ring plane must contain gravity and its own ear's channel
+    const okHoops = hoops.filter((hoop) => {
+      const axis = new THREE.Vector3(0, 0, 1).applyQuaternion(hoop.getWorldQuaternion(new THREE.Quaternion()));
+      return Math.abs(axis.y) < 0.02 && (Math.abs(axis.dot(dirR)) < 0.02 || Math.abs(axis.dot(dirL)) < 0.02);
+    });
+    results.push("hoops thread the channel (hangs with gravity, perpendicular to its ear's channel): " + (hoops.length === 2 && okHoops.length === hoops.length) + " (" + okHoops.length + "/" + hoops.length + " mirrored hoops)");
+    S.bust.ear.lobe.piece = "stud"; buildPiercings();
     S.subject = "bust"; BUST.root.visible = true; if (HAND.root) HAND.root.visible = false;
     const ser = serializeState(false);
     results.push("state carries subject+bust: " + (ser.subject === "bust" && ser.bust.tone.preset === "espresso" && ser.bust.necklace.style));

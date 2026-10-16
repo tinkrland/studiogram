@@ -16,7 +16,7 @@ const NOSE_PIECES = { nostril: ["none", "stud", "hoop"], septum: ["none", "hoop"
 const SEAT_SIZES = {
   ear:    { gem: 2.2, bead: 1.3, post: 0.6, disc: 2.2, hoop: 8.0, tube: 0.6 },
   nostril:{ gem: 1.6, bead: 1.0, post: 0.5, disc: 1.8, hoop: 3.2, tube: 0.45 },
-  septum: { hoop: 4.5, tube: 0.6 }
+  septum: { hoop: 5.5, tube: 0.6 }
 };
 
 function seatMetal(site) { return METALS[S.bust.ear[site].metal] || METALS.gold_14k_yellow; }
@@ -54,11 +54,18 @@ function buildSitePiece(frame, cfg, region) {
     disc.position.copy(back.clone().addScaledVector(dir, BUST_U(0.7)));
     disc.quaternion.copy(align);
   } else if (cfg.piece === "hoop") {
+    // a hoop passes through the channel and hangs: its ring plane contains
+    // the channel direction and gravity, so the ring threads the piercing
+    // instead of standing across it like a halo.
+    const down = new THREE.Vector3(0, -1, 0);
+    let n = new THREE.Vector3().crossVectors(dir, down);
+    if (n.lengthSq() < 1e-6) n = new THREE.Vector3(1, 0, 0); // vertical channel: pick any plane
+    n.normalize();
     const ring = add(new THREE.Mesh(
       new THREE.TorusGeometry(BUST_U(sz.hoop), BUST_U(sz.tube), 12, 36), mat
     ));
     ring.position.copy(pos.clone().add(back).multiplyScalar(0.5));
-    ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
   }
   return g;
 }
