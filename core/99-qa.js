@@ -300,12 +300,20 @@ async function runSelfTest() {
     buildNecklace();
     let links = 0; BUST.chainGroup.traverse((o) => { if (o.isMesh) links++; });
     let seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
-    results.push("chain meshes at 46cm with pendant: " + links + ", default lobe stud meshes: " + seats + " (post, gem, disc)");
+    results.push("chain meshes at 46cm with pendant: " + links + ", mirrored lobe stud meshes: " + seats + " (post, gem, disc x2 ears)");
+    S.bust.ear.mirror_left = false; buildPiercings();
+    seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
+    results.push("mirror off halves the seats: " + seats);
+    S.bust.nose.nostril.piece = "stud"; S.bust.nose.septum.piece = "hoop"; buildPiercings();
+    seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
+    results.push("nose seats add 4 meshes: " + seats + " (nostril pin post/gem/disc + septum ring)");
+    S.bust.nose.nostril.piece = "none"; S.bust.nose.septum.piece = "none";
+    S.bust.ear.mirror_left = true; buildPiercings();
     S.subject = "bust"; BUST.root.visible = true; if (HAND.root) HAND.root.visible = false;
     const ser = serializeState(false);
     results.push("state carries subject+bust: " + (ser.subject === "bust" && ser.bust.tone.preset === "espresso" && ser.bust.necklace.style));
     const restored = migrateBust(ser.bust);
-    results.push("bust state migrates clean: " + (restored.tone.preset === "espresso" && restored.ear.lobe.piece === "stud"));
+    results.push("bust state migrates clean: " + (restored.tone.preset === "espresso" && restored.ear.lobe.piece === "stud" && restored.ear.mirror_left === true && restored.nose.septum.piece === "none"));
     S.bust.tone = keepTone; applyBustTone();
     S.subject = "hand"; BUST.root.visible = false; if (HAND.root) HAND.root.visible = true;
   }

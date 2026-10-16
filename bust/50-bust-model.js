@@ -93,7 +93,7 @@ async function setSubject(kind) {
   if (kind !== "hand" && kind !== "bust") return;
   if (kind === "bust" && !BUST.loaded && !BUST.loadError) {
     await loadBustModel();
-    if (BUST.loaded) { applyBustTone(); buildEarSeats(); buildNecklace(); }
+    if (BUST.loaded) { applyBustTone(); buildPiercings(); buildNecklace(); }
   }
   S.subject = kind;
   if (BUST.loaded) BUST.root.visible = kind === "bust";

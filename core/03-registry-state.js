@@ -87,9 +87,15 @@ function defaultBust() {
       lobe: { piece: "stud", metal: "gold_14k_yellow", metalBead: false },
       helix: { piece: "none", metal: "gold_14k_yellow" },
       tragus: { piece: "none", metal: "gold_14k_yellow" },
-      conch: { piece: "none", metal: "gold_14k_yellow" }
+      conch: { piece: "none", metal: "gold_14k_yellow" },
+      mirror_left: true
     },
-    necklace: { style: "princess", length_cm: 46, metal: "gold_14k_yellow", pendant: true }
+    necklace: { style: "princess", length_cm: 46, metal: "gold_14k_yellow", pendant: true },
+    nose: {
+      nostril: { piece: "none", metal: "gold_14k_yellow" },
+      nostril_l: { piece: "none", metal: "gold_14k_yellow" },
+      septum: { piece: "none", metal: "silver_925" }
+    }
   };
 }
 function migrateBust(b) {
@@ -107,6 +113,15 @@ function migrateBust(b) {
     if (!METALS[out.ear[site].metal]) out.ear[site].metal = "gold_14k_yellow";
   }
   if (!METALS[out.necklace.metal]) out.necklace.metal = "gold_14k_yellow";
+  if (typeof out.ear.mirror_left !== "boolean") out.ear.mirror_left = true;
+  out.nose = { ...d.nose };
+  for (const site of ["nostril", "nostril_l", "septum"]) {
+    const src = (b.nose || {})[site] || {};
+    out.nose[site] = { ...d.nose[site], ...src };
+    const allowed = site === "septum" ? ["none", "hoop"] : ["none", "stud", "hoop"];
+    if (!allowed.includes(out.nose[site].piece)) out.nose[site].piece = "none";
+    if (!METALS[out.nose[site].metal]) out.nose[site].metal = d.nose[site].metal;
+  }
   if (typeof out.necklace.length_cm !== "number" || out.necklace.length_cm < 30 || out.necklace.length_cm > 65) out.necklace.length_cm = 46;
   if (!["none", "choker", "princess", "custom"].includes(out.necklace.style)) out.necklace.style = "princess";
   return out;

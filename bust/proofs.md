@@ -38,6 +38,14 @@ space) as sample data; the in-app solver regenerates curves from the
 rings on demand. necklace length is a number in scene state, so the
 same scene re-renders the same drape.
 
+## nose seats (added 2026-10-16)
+
+the same two-point threading for band-1 facial: nostril pins (right and
+left set separately) through the nostril wall, and a septum hoop hanging
+through the columella channel. anchors authored in bust/nose-frame.json
+from the sculpt's own anatomy. previews/app-nose-seats-sheet.png shows
+the live panel driving them.
+
 next: integrate the bust as a real subject (subject kind + panels +
 state), author shape keys per research/subject-morph-variance.md, and
 re-run the anchors on any revised sculpt.

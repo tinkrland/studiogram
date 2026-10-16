@@ -454,9 +454,15 @@ function defaultBust() {
       lobe: { piece: "stud", metal: "gold_14k_yellow", metalBead: false },
       helix: { piece: "none", metal: "gold_14k_yellow" },
       tragus: { piece: "none", metal: "gold_14k_yellow" },
-      conch: { piece: "none", metal: "gold_14k_yellow" }
+      conch: { piece: "none", metal: "gold_14k_yellow" },
+      mirror_left: true
     },
-    necklace: { style: "princess", length_cm: 46, metal: "gold_14k_yellow", pendant: true }
+    necklace: { style: "princess", length_cm: 46, metal: "gold_14k_yellow", pendant: true },
+    nose: {
+      nostril: { piece: "none", metal: "gold_14k_yellow" },
+      nostril_l: { piece: "none", metal: "gold_14k_yellow" },
+      septum: { piece: "none", metal: "silver_925" }
+    }
   };
 }
 function migrateBust(b) {
@@ -474,6 +480,15 @@ function migrateBust(b) {
     if (!METALS[out.ear[site].metal]) out.ear[site].metal = "gold_14k_yellow";
   }
   if (!METALS[out.necklace.metal]) out.necklace.metal = "gold_14k_yellow";
+  if (typeof out.ear.mirror_left !== "boolean") out.ear.mirror_left = true;
+  out.nose = { ...d.nose };
+  for (const site of ["nostril", "nostril_l", "septum"]) {
+    const src = (b.nose || {})[site] || {};
+    out.nose[site] = { ...d.nose[site], ...src };
+    const allowed = site === "septum" ? ["none", "hoop"] : ["none", "stud", "hoop"];
+    if (!allowed.includes(out.nose[site].piece)) out.nose[site].piece = "none";
+    if (!METALS[out.nose[site].metal]) out.nose[site].metal = d.nose[site].metal;
+  }
   if (typeof out.necklace.length_cm !== "number" || out.necklace.length_cm < 30 || out.necklace.length_cm > 65) out.necklace.length_cm = 46;
   if (!["none", "choker", "princess", "custom"].includes(out.necklace.style)) out.necklace.style = "princess";
   return out;
@@ -1981,7 +1996,7 @@ async function setSubject(kind) {
   if (kind !== "hand" && kind !== "bust") return;
   if (kind === "bust" && !BUST.loaded && !BUST.loadError) {
     await loadBustModel();
-    if (BUST.loaded) { applyBustTone(); buildEarSeats(); buildNecklace(); }
+    if (BUST.loaded) { applyBustTone(); buildPiercings(); buildNecklace(); }
   }
   S.subject = kind;
   if (BUST.loaded) BUST.root.visible = kind === "bust";
@@ -2006,12 +2021,13 @@ function updateSubjectTabs() {
     }
   });
 }
-// ===== ear seats: pierced jewelry on authored anchors =====
-// EAR_FRAME is authored from the sculpt's own anatomy (bust/ear-frame.json,
-// machine-picked 2026-10-14, lobe height still awaiting a human-eye pass).
-// each site carries pos (surface point), out (outward normal) and back (the
-// far side of the channel): a piece threads the two points, and occlusion
-// does the "through the tissue" work — no booleans.
+// ===== pierced seats: ears, nostrils, septum =====
+// EAR_FRAME and NOSE_FRAME are authored from the sculpt's own anatomy
+// (bust/ear-frame.json, bust/nose-frame.json): each site carries pos (surface
+// point), out (outward normal) and back (the far side of the channel). a
+// piece threads the two points and occlusion does the "through the tissue"
+// work — no booleans. the right ear and right nostril are authored; the left
+// side is a pure mirror, and the panel can turn that mirroring off.
 const EAR_FRAME = {
  "lobe": {
   "pos": [
@@ -2082,8 +2098,53 @@ const EAR_FRAME = {
   ]
  }
 };
+const NOSE_FRAME = {
+ "nostril": {
+  "pos": [
+   0.1004,
+   2.0886,
+   0.9254
+  ],
+  "out": [
+   0.4102,
+   0.29,
+   0.8646
+  ],
+  "back": [
+   0.0809,
+   2.0748,
+   0.8842
+  ]
+ },
+ "septum": {
+  "pos": [
+   0.0017,
+   2.1397,
+   1.0788
+  ],
+  "out": [
+   -0.0,
+   0.2425,
+   0.9701
+  ],
+  "back": [
+   0.0017,
+   2.1074,
+   0.9495
+  ]
+ }
+};
 const EAR_SITES = ["lobe", "helix", "tragus", "conch"];
 const EAR_PIECES = ["none", "stud", "hoop", "labret"];
+const NOSE_PIECES = { nostril: ["none", "stud", "hoop"], septum: ["none", "hoop"] };
+
+// per-region sizes in millimeters: the ear's stud is a lobe stud, the
+// nostril's is a tiny nose pin, the septum ring hangs under the columella
+const SEAT_SIZES = {
+  ear:    { gem: 2.2, bead: 1.3, post: 0.6, disc: 2.2, hoop: 8.0, tube: 0.6 },
+  nostril:{ gem: 1.6, bead: 1.0, post: 0.5, disc: 1.8, hoop: 3.2, tube: 0.45 },
+  septum: { hoop: 4.5, tube: 0.6 }
+};
 
 function seatMetal(site) { return METALS[S.bust.ear[site].metal] || METALS.gold_14k_yellow; }
 function metalMat(m) {
@@ -2094,55 +2155,76 @@ const GEM_MAT = new THREE.MeshPhysicalMaterial({
   transmission: 0.9, thickness: 0.4, ior: 2.4
 });
 
-// pieces are built per site from state, sized in real millimeters carried to
-// glb units. sizes are display truth, so the same state renders the same piece.
-function buildEarPiece(site) {
-  const f = EAR_FRAME[site];
-  const cfg = S.bust.ear[site];
-  const g = new THREE.Group();
-  g.name = "seat-" + site;
-  const mat = metalMat(seatMetal(site));
-  const pos = new THREE.Vector3(...f.pos), back = new THREE.Vector3(...f.back);
+// one site builder for every region: pieces are built per site from state,
+// sized in real millimeters carried to glb units. same state, same piece.
+function buildSitePiece(frame, cfg, region) {
+  const sz = SEAT_SIZES[region];
+  const mat = metalMat(METALS[cfg.metal] || METALS.gold_14k_yellow);
+  const pos = new THREE.Vector3(...frame.pos), back = new THREE.Vector3(...frame.back);
   const dir = back.clone().sub(pos).normalize();
   const len = pos.distanceTo(back);
   const align = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  const g = new THREE.Group();
   const add = (mesh) => { g.add(mesh); return mesh; };
   if (cfg.piece === "stud" || cfg.piece === "labret") {
-    const r = cfg.piece === "stud" ? BUST_U(0.6) : BUST_U(0.5);
+    const r = BUST_U(sz.post);
     const post = add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len + BUST_U(4), 10), mat));
     post.position.copy(pos.clone().add(back).multiplyScalar(0.5));
     post.quaternion.copy(align);
-    const beadR = cfg.piece === "stud" ? BUST_U(2.2) : BUST_U(1.3);
+    const beadR = cfg.piece === "stud" ? BUST_U(sz.gem) : BUST_U(sz.bead);
     const bead = add(new THREE.Mesh(
       new THREE.SphereGeometry(beadR, 20, 14),
       cfg.piece === "stud" && !cfg.metalBead ? GEM_MAT : mat
     ));
     bead.position.copy(pos.clone().addScaledVector(dir, beadR * 0.7));
-    const disc = add(new THREE.Mesh(new THREE.CylinderGeometry(BUST_U(2.2), BUST_U(2.2), BUST_U(0.4), 18), mat));
+    const disc = add(new THREE.Mesh(new THREE.CylinderGeometry(BUST_U(sz.disc), BUST_U(sz.disc), BUST_U(0.4), 18), mat));
     disc.position.copy(back.clone().addScaledVector(dir, BUST_U(0.7)));
     disc.quaternion.copy(align);
   } else if (cfg.piece === "hoop") {
-    const ring = add(new THREE.Mesh(new THREE.TorusGeometry(BUST_U(8), BUST_U(0.6), 12, 36), mat));
+    const ring = add(new THREE.Mesh(
+      new THREE.TorusGeometry(BUST_U(sz.hoop), BUST_U(sz.tube), 12, 36), mat
+    ));
     ring.position.copy(pos.clone().add(back).multiplyScalar(0.5));
     ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
   }
   return g;
 }
+const mirrorFrame = (f) => ({
+  pos: [-f.pos[0], f.pos[1], f.pos[2]],
+  out: [-f.out[0], f.out[1], f.out[2]],
+  back: [-f.back[0], f.back[1], f.back[2]]
+});
 
-// rebuild every seat from state: idempotent, called on subject entry, panel
-// changes and state restores alike
-function buildEarSeats() {
-  if (!BUST.loaded) return;
+// rebuild every pierced seat from state: idempotent, called on subject entry,
+// panel changes and state restores alike
+function clearSeatGroup() {
   for (const g of [...BUST.seatGroup.children]) {
     g.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
     BUST.seatGroup.remove(g);
   }
+}
+function buildEarSeats() {
+  if (!BUST.loaded) return;
   for (const site of EAR_SITES) {
     const cfg = S.bust.ear[site];
     if (!cfg || cfg.piece === "none") continue;
-    BUST.seatGroup.add(buildEarPiece(site));
+    BUST.seatGroup.add(buildSitePiece(EAR_FRAME[site], cfg, "ear"));
+    if (S.bust.ear.mirror_left) {
+      BUST.seatGroup.add(buildSitePiece(mirrorFrame(EAR_FRAME[site]), cfg, "ear"));
+    }
   }
 }
+function buildNoseSeats() {
+  if (!BUST.loaded) return;
+  const n = S.bust.nose;
+  const sites = [["nostril", NOSE_FRAME.nostril], ["nostril_l", mirrorFrame(NOSE_FRAME.nostril)], ["septum", NOSE_FRAME.septum]];
+  for (const [key, frame] of sites) {
+    const cfg = n[key];
+    if (!cfg || cfg.piece === "none" || !NOSE_PIECES[key.startsWith("nostril") ? "nostril" : "septum"].includes(cfg.piece)) continue;
+    BUST.seatGroup.add(buildSitePiece(frame, cfg, key.startsWith("nostril") ? "nostril" : "septum"));
+  }
+}
+function buildPiercings() { clearSeatGroup(); buildEarSeats(); buildNoseSeats(); }
 // ===== necklace drape: length is the only input =====
 // deterministic, no physics engine. NECK_RINGS holds first-hit resting
 // shells authored from the sculpt's own cross-sections (clavicle to jaw,
@@ -3004,7 +3086,7 @@ function renderBustPanel() {
   });
 
   const ear = section(PANEL, "ear seats");
-  hint(ear, "seats thread authored anatomy: front anchor to back exit, the ear hides the middle. the frame sits on the right ear; a human-eye pass on lobe height is pending.");
+  hint(ear, "seats thread authored anatomy: front anchor to back exit, the ear hides the middle. the left ear mirrors the right by default; the lobe height still awaits a human-eye pass.");
   for (const site of EAR_SITES) {
     const cfg = S.bust.ear[site];
     const row = el("div", "row");
@@ -3032,6 +3114,35 @@ function renderBustPanel() {
       row.appendChild(gem);
     }
     ear.appendChild(row);
+  }
+  const mrow = el("div", "row");
+  mrow.appendChild(el("label", null, "mirror to left ear"));
+  const mcb = document.createElement("input"); mcb.type = "checkbox";
+  mcb.checked = S.bust.ear.mirror_left;
+  mcb.addEventListener("change", () => { S.bust.ear.mirror_left = mcb.checked; buildPiercings(); saveState(); });
+  mrow.appendChild(mcb);
+  ear.appendChild(mrow);
+
+  const nose = section(PANEL, "nose seats");
+  hint(nose, "nostril pins thread the nostril wall, the septum ring hangs through the columella channel. both nostrils are set separately.");
+  for (const [key, label] of [["nostril", "right nostril"], ["nostril_l", "left nostril"], ["septum", "septum"]]) {
+    const cfg = S.bust.nose[key];
+    const row = el("div", "row");
+    row.appendChild(el("label", null, label));
+    const piece = document.createElement("select");
+    for (const o of NOSE_PIECES[key === "septum" ? "septum" : "nostril"]) {
+      const op = document.createElement("option"); op.value = o; op.textContent = o; piece.appendChild(op);
+    }
+    piece.value = cfg.piece;
+    piece.addEventListener("change", () => { cfg.piece = piece.value; buildPiercings(); saveState(); });
+    const metal = document.createElement("select");
+    for (const [k, m] of Object.entries(METALS)) {
+      const o = document.createElement("option"); o.value = k; o.textContent = m.label; metal.appendChild(o);
+    }
+    metal.value = cfg.metal;
+    metal.addEventListener("change", () => { cfg.metal = metal.value; buildPiercings(); saveState(); });
+    row.append(piece, metal);
+    nose.appendChild(row);
   }
 
   const neck = section(PANEL, "necklace");
@@ -3535,7 +3646,7 @@ async function syncSceneToState() {
   await buildHand();
   if (S.subject === "bust" && !BUST.loaded && !BUST.loadError) {
     await loadBustModel();
-    if (BUST.loaded) { applyBustTone(); buildEarSeats(); buildNecklace(); }
+    if (BUST.loaded) { applyBustTone(); buildPiercings(); buildNecklace(); }
   }
   if (BUST.loaded) BUST.root.visible = S.subject === "bust";
   if (HAND.root) HAND.root.visible = S.subject === "hand";
@@ -4578,12 +4689,20 @@ async function runSelfTest() {
     buildNecklace();
     let links = 0; BUST.chainGroup.traverse((o) => { if (o.isMesh) links++; });
     let seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
-    results.push("chain meshes at 46cm with pendant: " + links + ", default lobe stud meshes: " + seats + " (post, gem, disc)");
+    results.push("chain meshes at 46cm with pendant: " + links + ", mirrored lobe stud meshes: " + seats + " (post, gem, disc x2 ears)");
+    S.bust.ear.mirror_left = false; buildPiercings();
+    seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
+    results.push("mirror off halves the seats: " + seats);
+    S.bust.nose.nostril.piece = "stud"; S.bust.nose.septum.piece = "hoop"; buildPiercings();
+    seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
+    results.push("nose seats add 4 meshes: " + seats + " (nostril pin post/gem/disc + septum ring)");
+    S.bust.nose.nostril.piece = "none"; S.bust.nose.septum.piece = "none";
+    S.bust.ear.mirror_left = true; buildPiercings();
     S.subject = "bust"; BUST.root.visible = true; if (HAND.root) HAND.root.visible = false;
     const ser = serializeState(false);
     results.push("state carries subject+bust: " + (ser.subject === "bust" && ser.bust.tone.preset === "espresso" && ser.bust.necklace.style));
     const restored = migrateBust(ser.bust);
-    results.push("bust state migrates clean: " + (restored.tone.preset === "espresso" && restored.ear.lobe.piece === "stud"));
+    results.push("bust state migrates clean: " + (restored.tone.preset === "espresso" && restored.ear.lobe.piece === "stud" && restored.ear.mirror_left === true && restored.nose.septum.piece === "none"));
     S.bust.tone = keepTone; applyBustTone();
     S.subject = "hand"; BUST.root.visible = false; if (HAND.root) HAND.root.visible = true;
   }

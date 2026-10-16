@@ -128,7 +128,7 @@ async function syncSceneToState() {
   await buildHand();
   if (S.subject === "bust" && !BUST.loaded && !BUST.loadError) {
     await loadBustModel();
-    if (BUST.loaded) { applyBustTone(); buildEarSeats(); buildNecklace(); }
+    if (BUST.loaded) { applyBustTone(); buildPiercings(); buildNecklace(); }
   }
   if (BUST.loaded) BUST.root.visible = S.subject === "bust";
   if (HAND.root) HAND.root.visible = S.subject === "hand";

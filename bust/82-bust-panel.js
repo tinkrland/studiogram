@@ -41,7 +41,7 @@ function renderBustPanel() {
   });
 
   const ear = section(PANEL, "ear seats");
-  hint(ear, "seats thread authored anatomy: front anchor to back exit, the ear hides the middle. the frame sits on the right ear; a human-eye pass on lobe height is pending.");
+  hint(ear, "seats thread authored anatomy: front anchor to back exit, the ear hides the middle. the left ear mirrors the right by default; the lobe height still awaits a human-eye pass.");
   for (const site of EAR_SITES) {
     const cfg = S.bust.ear[site];
     const row = el("div", "row");
@@ -69,6 +69,35 @@ function renderBustPanel() {
       row.appendChild(gem);
     }
     ear.appendChild(row);
+  }
+  const mrow = el("div", "row");
+  mrow.appendChild(el("label", null, "mirror to left ear"));
+  const mcb = document.createElement("input"); mcb.type = "checkbox";
+  mcb.checked = S.bust.ear.mirror_left;
+  mcb.addEventListener("change", () => { S.bust.ear.mirror_left = mcb.checked; buildPiercings(); saveState(); });
+  mrow.appendChild(mcb);
+  ear.appendChild(mrow);
+
+  const nose = section(PANEL, "nose seats");
+  hint(nose, "nostril pins thread the nostril wall, the septum ring hangs through the columella channel. both nostrils are set separately.");
+  for (const [key, label] of [["nostril", "right nostril"], ["nostril_l", "left nostril"], ["septum", "septum"]]) {
+    const cfg = S.bust.nose[key];
+    const row = el("div", "row");
+    row.appendChild(el("label", null, label));
+    const piece = document.createElement("select");
+    for (const o of NOSE_PIECES[key === "septum" ? "septum" : "nostril"]) {
+      const op = document.createElement("option"); op.value = o; op.textContent = o; piece.appendChild(op);
+    }
+    piece.value = cfg.piece;
+    piece.addEventListener("change", () => { cfg.piece = piece.value; buildPiercings(); saveState(); });
+    const metal = document.createElement("select");
+    for (const [k, m] of Object.entries(METALS)) {
+      const o = document.createElement("option"); o.value = k; o.textContent = m.label; metal.appendChild(o);
+    }
+    metal.value = cfg.metal;
+    metal.addEventListener("change", () => { cfg.metal = metal.value; buildPiercings(); saveState(); });
+    row.append(piece, metal);
+    nose.appendChild(row);
   }
 
   const neck = section(PANEL, "necklace");
