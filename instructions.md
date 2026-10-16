@@ -55,10 +55,19 @@ invariants, which this build must keep:
   `npm i` first), the `#selftest` in-page pixel check, and the `#audit`
   scene probe. keep them current when behavior changes; the previous pass
   added checks this way (pinned reproduction, unload flush).
-- after each rebuild, the deployed page is the uploaded `artifact/index.html`;
-  the upload produces a new public url and `functions/serve-studiogram.ts`
-  must be updated to point at it. keep that deploy step in this doc, not
-  in anyone's head or a sandbox: the repo is the source of truth.
+- delivery: github pages serves the artifact straight from the repo —
+  `https://tinkrland.github.io/studiogram/artifact/` (pages is enabled once
+  in repo settings: deploy from branch `main`, folder `/`; `.nojekyll` at the
+  root keeps pages a dumb static server). after each rebuild, `git push` IS
+  the deploy.
+- the `functions/serve-studiogram.ts` route is dead as of 2026-10-16: the
+  platform now force-strips a function's own content-security-policy header
+  and injects `script-src 'none'`, which blocks every script in the
+  artifact (inline module and data-uri imports alike). the function stays
+  in the repo for the day the platform honors function headers again, but
+  pages is the live path.
+- the page can also be opened straight from a checkout: `artifact/index.html`
+  works from the filesystem, which is how the selftest harness runs it.
 
 ## current state (as of the unload-flush commit)
 
