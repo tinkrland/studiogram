@@ -14,6 +14,7 @@ async function runSelfTest() {
   const results = [];
   results.push("build marker: rigged-hand-1");
   results.push("bones: " + HAND.boneCount + ", skinned verts: " + HAND.skinned.geometry.attributes.position.count);
+  results.push("hand root singular: " + (HAND.root.parent.children.filter((c) => c.name === "hand").length === 1) + " (a boot race used to leak a ghost)");
   results.push("bone names: " + [...HAND.bones.keys()].join(", "));
   results.push("ring bone found: " + !!HAND.bones.get("finger_ring01L") + ", bone len: " + (HAND.boneLen.get("ring") || 0).toFixed(4));
   const j = [...JEWELRY.values()][0];
@@ -294,8 +295,10 @@ async function runSelfTest() {
     S.bust.tone = { preset: "espresso", lightness: 0, warmth: 0, depth: 0 };
     applyBustTone();
     results.push("bust tone espresso: " + bustAlbedoHex() + " (expect #724932)");
-    const d1 = solveDrape(46), d2 = solveDrape(46), d3 = solveDrape(40);
-    results.push("drape 46cm sag: " + d1.sag.toFixed(4) + ", deterministic: " + (d1.sag === d2.sag) + ", choker nearly taut: " + (d3.sag < 0.03 && d3.sag < d1.sag));
+    const d1 = solveDrape(46), d2 = solveDrape(46), d3 = solveDrape(40), d4 = solveDrape(36);
+    results.push("drape 46cm sag: " + d1.sag.toFixed(4) + ", deterministic: " + (d1.sag === d2.sag) +
+      ", lengths order with depth: " + (d4.sag < d3.sag && d3.sag < d1.sag) +
+      " (" + d4.sag.toFixed(3) + " < " + d3.sag.toFixed(3) + " < " + d1.sag.toFixed(3) + ")");
     results.push("drape length residual: " + Math.abs(necklaceLength(d1.pts) - 46 / 10.5).toExponential(1) + " glb units");
     buildNecklace();
     let links = 0; BUST.chainGroup.traverse((o) => { if (o.isMesh) links++; });

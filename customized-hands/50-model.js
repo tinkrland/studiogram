@@ -27,7 +27,19 @@ const HAND = {
   }
 };
 
-async function loadHandModel() {
+let HAND_LOAD = null; // in-flight promise: boot fires buildHand un-awaited and
+// addJewelryInstance awaits it too — two concurrent entries used to both
+// pass the loaded guard (it flips only after the async parse) and each
+// created a hand root, leaking one visible ghost into the scene.
+function loadHandModel() {
+  if (HAND.loaded) return Promise.resolve();
+  if (HAND_LOAD) return HAND_LOAD;
+  const p = doLoadHandModel();
+  HAND_LOAD = p;
+  p.catch(() => { HAND_LOAD = null; }); // a failed load may be retried
+  return p;
+}
+async function doLoadHandModel() {
   if (HAND.loaded) return;
   const bin = Uint8Array.from(atob(HAND_GLB_B64), (c) => c.charCodeAt(0));
   const gltf = await new GLTFLoader().parseAsync(bin.buffer, "");
@@ -80,6 +92,7 @@ async function loadHandModel() {
   }
   computeFingerRadii();
   HAND.loaded = true;
+  HAND_LOAD = null;
   applyNails();
   applyFinish();
 }

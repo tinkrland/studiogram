@@ -6,7 +6,8 @@
 // front dips only as far as the extra chain allows — same mesh + same length,
 // same curve, every time.
 const NECK_RINGS = /*__NECKRINGS__*/{};
-const NECK_TOP = 1.0;       // resting band (glb units, below the jaw)
+const NECK_TOP = 0.8;       // the resting band: the thin upper neck, where a
+                          // chain actually sits; surplus length dips the front
 const NECK_MARGIN = BUST_U(1.2); // chain rides just off the skin
 
 function ringLookup(theta, y) {
@@ -22,7 +23,7 @@ function ringLookup(theta, y) {
   const r0 = rs[iy], r1 = rs[Math.min(iy + 1, rs.length - 1)];
   const ty = r1.y === r0.y ? 0 : Math.max(0, Math.min(1, (y - r0.y) / (r1.y - r0.y)));
   const rad = (1 - ft) * ((1 - ty) * r0.r[ia0] + ty * r1.r[ia0]) + ft * ((1 - ty) * r0.r[ia1] + ty * r1.r[ia1]);
-  const c = [(1 - ty) * r0.c[0] + ty * r1.c[0], (1 - ty) * r0.c[1] + ty * r1.c[1]];
+  const c = NECK_RINGS.axis; // the shells share the neck-column axis
   return { c, rad: (rad || 0.3) + NECK_MARGIN };
 }
 
@@ -31,7 +32,7 @@ function necklacePoints(sag, n = 500) {
   for (let i = 0; i < n; i++) {
     const th = -Math.PI + (2 * Math.PI * i) / n;
     const h = (1 - Math.cos(th - Math.PI / 2)) / 2; // 0 at the nape, 1 at the throat
-    const y = Math.max(0.3, Math.min(1.1, NECK_TOP - sag * h));
+    const y = Math.max(0.15, Math.min(0.85, NECK_TOP - sag * h));
     const { c, rad } = ringLookup(th, y);
     pts.push([c[0] + rad * Math.cos(th), y, c[1] + rad * Math.sin(th)]);
   }

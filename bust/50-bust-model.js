@@ -24,7 +24,17 @@ async function sha256hexOf(buf) {
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function loadBustModel() {
+let BUST_LOAD = null; // same in-flight guard as the hand: the panel click and
+// a state import can both enter while the fetch is pending
+function loadBustModel() {
+  if (BUST.loaded || BUST.loadError) return Promise.resolve();
+  if (BUST_LOAD) return BUST_LOAD;
+  const p = doLoadBustModel();
+  BUST_LOAD = p;
+  p.finally(() => { BUST_LOAD = null; });
+  return p;
+}
+async function doLoadBustModel() {
   if (BUST.loaded || BUST.loadError) return;
   const res = await fetch(BUST_URL, { cache: "force-cache" });
   if (!res.ok) { BUST.loadError = "fetch failed: " + res.status; return; }
