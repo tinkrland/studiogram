@@ -14,6 +14,14 @@ each concern is a separate system with its own state:
 - the talent: the rigged hand or bust, with skin tone, body hair, 19 nail
   shapes, tattoo ink painted into the texture, and seven blend-target
   morphs. a hand model and wardrobe department in one subject panel.
+  the doll is the default: a single matte ivory material over the whole
+  skinned mesh, in the code's own words "jewelry photography favors the
+  quiet matte doll — the piece is the subject, the hand is the stand".
+  the skin finish is the full dressing room: color rebuilt from the
+  chosen albedo so pale stays pale and deep stays deep, seeded follicle
+  strokes for body hair, ink committed into the texture atlas so it
+  rides posing and morphs, polish tinting the real nail-plate geometry
+  instead of a smudged atlas ellipse.
 - the set: backdrop and scene, switchable mid-take on video, never frozen
   behind the subject.
 - the arrangement: every piece is an independent object at a named seat
