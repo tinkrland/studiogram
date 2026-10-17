@@ -120,7 +120,20 @@ async function runSelfTest() {
       " (base -> mid " + mid.toFixed(2) + " -> held " + held.toFixed(2) + " -> " + late.toFixed(2) + ", thumb " + thumbLate.toFixed(2) + ")");
     const ser = serializeState();
     results.push("moves serialize with state: " + (Array.isArray(ser.moves) && ser.moves.length === 0));
-    // the retake channel: a take's recorded hand motion replays on a new
+    // the subject opens as a person: real skin, golden tone — porcelain is
+  // an explicit choice whose flag must survive the round-trip
+  {
+    const d = defaultState();
+    const fresh = d.hand.finish === "skin" && d.hand.skin.preset === "golden";
+    const keepFinish = S.hand.finish, keepChosen = S.hand.finish_chosen;
+    S.hand.finish = "porcelain"; S.hand.finish_chosen = true;
+    const ser = serializeState();
+    const kept = ser.hand.finish === "porcelain" && ser.hand.finish_chosen === true;
+    S.hand.finish = keepFinish; S.hand.finish_chosen = keepChosen;
+    results.push("default subject is skin-toned, porcelain stays explicit: " + (fresh && kept) + " (default " + d.hand.finish + " · " + d.hand.skin.preset + ")");
+  }
+
+  // the retake channel: a take's recorded hand motion replays on a new
     // take's clock while the camera is driven fresh. pure, so deterministic.
     const rrec = { path: [
       { t: 1000, pose: JSON.parse(JSON.stringify(S.pose)) },
@@ -618,6 +631,7 @@ async function runSceneAudit() {
     await runSelfTest();
     function animate() { requestAnimationFrame(animate); if (VIEW_LOCKED) return; if (S.live.mode === "orbit") controls.update(); renderFrame(); }
     animate();
+    dismissBootSplash();
     return;
   }
   const restored = restoreFromStorage();
@@ -651,5 +665,16 @@ async function runSceneAudit() {
     renderFrame();
   }
   animate();
+  // the splash fades only after a real frame has been painted
+  dismissBootSplash();
 })();
+
+function dismissBootSplash() {
+  const sp = document.getElementById("boot-splash");
+  if (!sp) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    sp.classList.add("gone");
+    setTimeout(() => sp.remove(), 650);
+  }));
+}
 

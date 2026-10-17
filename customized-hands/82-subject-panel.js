@@ -13,11 +13,11 @@ function renderSubjectPanel() {
   }
 
   const finish = section(PANEL, "finish");
-  hint(finish, "the hand presents as a matte porcelain display hand, or with its original skin textures. the piece is the subject; the hand is the stand.");
+  hint(finish, "the hand opens in its real skin. porcelain is the display-hand look, chosen on purpose — the choice sticks across reloads.");
   const finishRow = el("div", "btnrow");
   for (const key of ["porcelain", "skin"]) {
     const b = el("button", "btn" + (S.hand.finish === key ? " primary" : ""), key);
-    b.addEventListener("click", () => { S.hand.finish = key; applyFinish(); saveState(); renderSubjectPanel(); });
+    b.addEventListener("click", () => { S.hand.finish = key; S.hand.finish_chosen = true; applyFinish(); saveState(); renderSubjectPanel(); });
     finishRow.appendChild(b);
   }
   finish.appendChild(finishRow);

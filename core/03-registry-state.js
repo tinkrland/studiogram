@@ -71,7 +71,8 @@ const FINGERS = ["index", "middle", "ring", "pinky", "thumb"];
 function defaultHand() {
   return {
     model: "rigged-hand-v4.1",
-    finish: "porcelain",
+    finish: "skin",     // the subject opens as a person, in real skin
+    finish_chosen: false,    // porcelain is the display-hand look, picked on purpose
     presentation: "hand", // hand | male hand | female hand — blend weights, not files
     morph: { build: 0, finger_length: 0, finger_thickness: 0, palm_width: 0, palm_proportions: 0, nail_length: 0, nail_shape: 0 },
     skin: { preset: "golden", lightness: 0, warmth: 0, depth: 0, hair: 0.35 }, // surface layer: a preset albedo plus three adjustments; hair is drawn follicles on the forearm
@@ -201,6 +202,7 @@ function snapshotHand() {
     presentation: S.hand.presentation,
     morph: S.hand.morph,
     finish: S.hand.finish,
+    finish_chosen: !!S.hand.finish_chosen,
     skin: S.hand.skin,
     nails: S.hand.nails,
     tattoos: S.hand.tattoos,
@@ -222,7 +224,8 @@ function applySavedHand(cfg) {
   const h = JSON.parse(JSON.stringify(cfg.hand));
   S.hand.presentation = h.presentation || "hand";
   S.hand.morph = h.morph || defaultHand().morph;
-  S.hand.finish = h.finish || "porcelain";
+  S.hand.finish = h.finish || "skin";
+  S.hand.finish_chosen = !!h.finish_chosen;
   S.hand.skin = migrateSkin(h.skin);
   S.hand.nails = h.nails || defaultHand().nails;
   S.hand.tattoos = h.tattoos || [];

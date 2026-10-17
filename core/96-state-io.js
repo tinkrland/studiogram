@@ -38,6 +38,9 @@ async function applyFullState(raw, opts = {}) {
     st.environment = { ...b, preset: st.environment.backdrop };
   }
   if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
+  // porcelain was the authored default, never an owner choice: saves that
+  // never chose it open in skin now. an explicit choice carries its flag.
+  if (st.hand && !st.hand.finish_chosen) st.hand.finish = "skin";
   st.subject = st.subject === "bust" ? "bust" : "hand"; // pre-bust saves stay on the hand
   st.bust = migrateBust(st.bust);
   // moves: the choreography is an ordered list; anything malformed drops out

@@ -438,7 +438,8 @@ const FINGERS = ["index", "middle", "ring", "pinky", "thumb"];
 function defaultHand() {
   return {
     model: "rigged-hand-v4.1",
-    finish: "porcelain",
+    finish: "skin",     // the subject opens as a person, in real skin
+    finish_chosen: false,    // porcelain is the display-hand look, picked on purpose
     presentation: "hand", // hand | male hand | female hand — blend weights, not files
     morph: { build: 0, finger_length: 0, finger_thickness: 0, palm_width: 0, palm_proportions: 0, nail_length: 0, nail_shape: 0 },
     skin: { preset: "golden", lightness: 0, warmth: 0, depth: 0, hair: 0.35 }, // surface layer: a preset albedo plus three adjustments; hair is drawn follicles on the forearm
@@ -568,6 +569,7 @@ function snapshotHand() {
     presentation: S.hand.presentation,
     morph: S.hand.morph,
     finish: S.hand.finish,
+    finish_chosen: !!S.hand.finish_chosen,
     skin: S.hand.skin,
     nails: S.hand.nails,
     tattoos: S.hand.tattoos,
@@ -589,7 +591,8 @@ function applySavedHand(cfg) {
   const h = JSON.parse(JSON.stringify(cfg.hand));
   S.hand.presentation = h.presentation || "hand";
   S.hand.morph = h.morph || defaultHand().morph;
-  S.hand.finish = h.finish || "porcelain";
+  S.hand.finish = h.finish || "skin";
+  S.hand.finish_chosen = !!h.finish_chosen;
   S.hand.skin = migrateSkin(h.skin);
   S.hand.nails = h.nails || defaultHand().nails;
   S.hand.tattoos = h.tattoos || [];
@@ -3067,11 +3070,11 @@ function renderSubjectPanel() {
   }
 
   const finish = section(PANEL, "finish");
-  hint(finish, "the hand presents as a matte porcelain display hand, or with its original skin textures. the piece is the subject; the hand is the stand.");
+  hint(finish, "the hand opens in its real skin. porcelain is the display-hand look, chosen on purpose — the choice sticks across reloads.");
   const finishRow = el("div", "btnrow");
   for (const key of ["porcelain", "skin"]) {
     const b = el("button", "btn" + (S.hand.finish === key ? " primary" : ""), key);
-    b.addEventListener("click", () => { S.hand.finish = key; applyFinish(); saveState(); renderSubjectPanel(); });
+    b.addEventListener("click", () => { S.hand.finish = key; S.hand.finish_chosen = true; applyFinish(); saveState(); renderSubjectPanel(); });
     finishRow.appendChild(b);
   }
   finish.appendChild(finishRow);
@@ -4864,6 +4867,9 @@ async function applyFullState(raw, opts = {}) {
     st.environment = { ...b, preset: st.environment.backdrop };
   }
   if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
+  // porcelain was the authored default, never an owner choice: saves that
+  // never chose it open in skin now. an explicit choice carries its flag.
+  if (st.hand && !st.hand.finish_chosen) st.hand.finish = "skin";
   st.subject = st.subject === "bust" ? "bust" : "hand"; // pre-bust saves stay on the hand
   st.bust = migrateBust(st.bust);
   // moves: the choreography is an ordered list; anything malformed drops out
@@ -5070,7 +5076,20 @@ async function runSelfTest() {
       " (base -> mid " + mid.toFixed(2) + " -> held " + held.toFixed(2) + " -> " + late.toFixed(2) + ", thumb " + thumbLate.toFixed(2) + ")");
     const ser = serializeState();
     results.push("moves serialize with state: " + (Array.isArray(ser.moves) && ser.moves.length === 0));
-    // the retake channel: a take's recorded hand motion replays on a new
+    // the subject opens as a person: real skin, golden tone — porcelain is
+  // an explicit choice whose flag must survive the round-trip
+  {
+    const d = defaultState();
+    const fresh = d.hand.finish === "skin" && d.hand.skin.preset === "golden";
+    const keepFinish = S.hand.finish, keepChosen = S.hand.finish_chosen;
+    S.hand.finish = "porcelain"; S.hand.finish_chosen = true;
+    const ser = serializeState();
+    const kept = ser.hand.finish === "porcelain" && ser.hand.finish_chosen === true;
+    S.hand.finish = keepFinish; S.hand.finish_chosen = keepChosen;
+    results.push("default subject is skin-toned, porcelain stays explicit: " + (fresh && kept) + " (default " + d.hand.finish + " · " + d.hand.skin.preset + ")");
+  }
+
+  // the retake channel: a take's recorded hand motion replays on a new
     // take's clock while the camera is driven fresh. pure, so deterministic.
     const rrec = { path: [
       { t: 1000, pose: JSON.parse(JSON.stringify(S.pose)) },
@@ -5568,6 +5587,7 @@ async function runSceneAudit() {
     await runSelfTest();
     function animate() { requestAnimationFrame(animate); if (VIEW_LOCKED) return; if (S.live.mode === "orbit") controls.update(); renderFrame(); }
     animate();
+    dismissBootSplash();
     return;
   }
   const restored = restoreFromStorage();
@@ -5601,5 +5621,16 @@ async function runSceneAudit() {
     renderFrame();
   }
   animate();
+  // the splash fades only after a real frame has been painted
+  dismissBootSplash();
 })();
+
+function dismissBootSplash() {
+  const sp = document.getElementById("boot-splash");
+  if (!sp) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    sp.classList.add("gone");
+    setTimeout(() => sp.remove(), 650);
+  }));
+}
 
