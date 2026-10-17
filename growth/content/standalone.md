@@ -77,6 +77,12 @@ asset loads, so a retake, a re-pose, or a crop change costs nothing and
 waits for nothing. a diffusion tool bills and waits per generation, and
 every one of those bills was a lottery ticket on the subject's likeness.
 
+the cost structure is quiet all the way down. bring your own google
+account and prop generation runs in google colab on sam 3d: no gcp
+project, nothing provisioned, no infrastructure bill. renders are your
+gpu's work, not ours. a free tier can be honest when the marginal cost
+of a frame is zero.
+
 ## why not generation
 
 2026 is the year platforms made buyers pay for generated product
@@ -86,6 +92,14 @@ realistic ai creative and downranks the undisclosed. the risk that kills
 accounts is not the label, it is misrepresentation: the photo that
 promises what the product is not. a generated image cannot promise what
 it will show. a render of the real mesh cannot break that promise.
+
+and the details: generation redraws prongs, engraving, stone counts,
+proportions from a statistical guess of what products look like. fix one
+thing and it forgets another: regenerate for a new angle and every
+detail is redrawn from scratch, whether you asked or not. proskena
+draws the mesh that goes to the caster, and cannot warp what it never
+guesses: every pixel is a function of the scene state. the angle
+changes, the product stays, because there is nothing to forget.
 
 disclosure stays yours either way: a proskena capture is synthetic media
 and should be disclosed where a platform asks. the difference is the
