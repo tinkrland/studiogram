@@ -5,44 +5,65 @@ status: draft, waits in review
 
 # proskena
 
-a whole photography studio in your browser. bring a mesh, leave with a
-shoot.
+a whole photography studio in your browser. direct the shoot, keep the
+pixels.
 
-proskena renders the exact geometry that goes to manufacturing on a
-rigged hand you can pose, dress, and recast at will. no diffusion model
-ever touches the product: the image is the product, by construction,
-hash-verified.
+proskena renders real jewelry geometry on a rigged hand you can pose,
+dress, and recast at will. no diffusion model ever touches the subject:
+the image is the object, by construction, hash-verified. and you do not
+need to own a cad file to start: the studio ships a fixture catalog of
+pieces that are cc0 for commercial use. shoot them, sell them, mood-board
+them. bring your own mesh only when the photo must document your exact
+product.
 
-## the studio has roles, not a prompt
+## how it maps to a real studio
 
-photography is not one tool, it is a workplace with departments. proskena
-keeps them separate, the way a real studio does:
+the product is organized the way a working studio is staffed. every
+department is its own system, so changing one never re-rolls the others:
+
+- **the model.** the rigged hand or bust in front of the camera. pose it
+  from authored presets or bend it finger by finger with curl and spread
+  sliders; the jewelry follows the bone automatically.
+- **the dressing room.** hand customization is wardrobe and styling:
+  porcelain display finish or skin, tones rebuilt from the albedo so
+  pale stays pale and deep stays deep, seeded forearm follicles for body
+  hair, tattoo ink committed into the texture so it rides posing, 19
+  nail shapes with real plate geometry, polish, seven blend-target
+  morphs for the wrist itself.
+- **the set dresser.** backdrops and scene, its own panel, switchable
+  mid-take on video. change the set without touching the talent.
+- **the prop artist.** a different job from the set dresser: the props
+  are their own layer, and the hero product is never a prop. background
+  props can come from meta sam 3d run in google colab, quarantined to set
+  dressing where a hallucinated leaf costs nothing.
+- **the gaffer.** the lighting rig is separate from the camera. relight
+  without re-shooting, the way a studio relights a standing setup.
+- **the cameraman.** lenses, focal distance, camera-owned depth of
+  field. move it mid-take, the way you would move behind a real tripod.
+- **the photographer.** you. direct all of the above in the same frame,
+  no prompt, no generation round trip.
+
+that separation is the whole idea. a diffusion tool folds every
+department into one prompt and hands you a lottery ticket. proskena
+keeps the crew, so re-posing never re-rolls the product and relighting
+never re-rolls the pose.
+
+## what you get
 
 - **the talent.** a rigged hand with a real 33-bone skeleton, or a bust
-  with face, chest, ear, and nose seats. pose it from authored presets or
-  bend it finger by finger with curl and spread sliders. it presents by
-  default as a quiet matte porcelain display hand: the piece is the
-  subject, the hand is the stand. switch it to skin and the dressing room
-  opens: tones rebuilt from the albedo so pale stays pale and deep stays
-  deep, forearm body hair as seeded follicle strokes, tattoo ink that
-  commits into the texture so it rides posing for free, 19 nail shapes
-  with real plate geometry and polish, and seven blend-target morphs
-  that reshape the wrist without re-sculpting.
-- **the set.** backdrops and scene, switchable mid-take on video. never
-  frozen behind the subject.
-- **the arrangement.** every piece of jewelry is an independent object at
-  a named seat: finger, wrist, ear lobe, pierced ear, nose, chest.
-  rings stack along the limb, hoops thread the piercings, necklaces
-  drape with real chain physics. change the pose and the pieces follow
-  the bone.
-- **the light.** a lighting rig with its own panel. relight without
-  re-shooting.
-- **the camera.** lenses, focal distance, camera-owned depth of field.
-  move it mid-take, the way you would move behind a real tripod.
+  with face, chest, ear, and nose seats. porcelain matte by default, the
+  quiet display hand: the piece is the subject, the hand is the stand.
+- **the arrangement.** every piece is an independent object at a named
+  seat: finger, wrist, ear lobe, pierced ear, nose, chest. rings stack
+  along the limb, hoops thread the piercings, necklaces drape with real
+  chain physics.
+- **the fixture catalog.** built-in pieces, cc0 for commercial use, with
+  tamper-evident hash chains on every record. shoot today, no mesh
+  required.
 - **the output.** photos and video from the same scene state. crops in
-  4:5, 9:16, and 1:1 without a re-shoot. captures are creator outputs
-  with provenance records, and retakes are byte-identical: re-open the
-  scene, get the same pixels.
+  4:5, 9:16, and 1:1 without a re-shoot. captures carry provenance
+  records, and retakes are byte-identical: re-open the scene, get the
+  same pixels.
 
 ## you are the photographer
 
@@ -52,10 +73,9 @@ way you would ask a model to tilt a wrist. proskena answers in the same
 frame.
 
 the economics follow: every render is local. the only network calls are
-asset loads (your mesh, the hand, the bust), so a retake, a re-pose, or a
-crop change costs nothing and waits for nothing. a diffusion tool bills
-and waits per generation, and every one of those bills was a lottery
-ticket on your product's likeness.
+asset loads, so a retake, a re-pose, or a crop change costs nothing and
+waits for nothing. a diffusion tool bills and waits per generation, and
+every one of those bills was a lottery ticket on the subject's likeness.
 
 ## why not generation
 
@@ -67,35 +87,36 @@ accounts is not the label, it is misrepresentation: the photo that
 promises what the product is not. a generated image cannot promise what
 it will show. a render of the real mesh cannot break that promise.
 
-and the details: generation redraws prongs, engraving, stone counts,
-proportions from a statistical guess of what products look like. proskena
-draws the mesh that goes to the caster. every tweak stays a slider, not
-a re-roll.
-
 disclosure stays yours either way: a proskena capture is synthetic media
 and should be disclosed where a platform asks. the difference is the
-disclosure is easy to make honestly when the image is the product.
+disclosure is easy to make honestly when the image is the object.
 
 ## who it is for
 
 - **the made-to-order jeweler.** lost-wax casting starts from a cad
   mesh, so the file exists before the piece does. photograph it before
   it exists, exactly, in the crop your listing needs.
+- **the faceless content maker.** pinterest boards, instagram carousels,
+  mood imagery with no model to book and no face to show. the porcelain
+  hand and the bust shoot faceless by design.
 - **the small brand running drops.** listing and social imagery on a
-  schedule, many crops from one scene, no hand model to book.
+  schedule, many crops from one scene, retakes that cost nothing.
 - **anyone burned by the label wave.** if you have been flagged for
   generated imagery, this is the other road: exact by construction.
 
+and not only jewelry. watches, eyewear, accessories, anything small and
+wearable that performs on a hand, a wrist, or a bust. the architecture
+is subject-shaped, not jewelry-shaped.
+
 ## the honest limits
 
-- you need a mesh. photo-only sellers have no onramp yet; background
-  props can come from meta sam 3d run in colab, but the hero product is
-  mesh-only, always.
+- your own product still needs its mesh when the photo must document
+  your exact piece. until then, the cc0 fixtures cover the shoot.
 - generation is quarantined to set dressing. it never touches the
-  product.
-- jewelry is the credible wedge today: rings, earrings, hoops,
-  necklaces, bracelets. the architecture is subject-shaped, not
-  jewelry-shaped.
+  subject.
+- the hand model carries a cc by-sa 3.0 license; its credit is rendered
+  in the subject panel, and presentation choices for public imagery are
+  a ruling still open.
 
 ## about the name
 
