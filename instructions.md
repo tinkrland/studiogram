@@ -69,7 +69,7 @@ invariants, which this build must keep:
 - the page can also be opened straight from a checkout: `artifact/index.html`
   works from the filesystem, which is how the selftest harness runs it.
 
-## current state (as of the unload-flush commit)
+## current state (as of the props + take-choreography pass)
 
 - subject: rigged hand (8970 verts, 33 bones), five pose presets, per-
   finger curl/spread, wrist framing; seven authored blend targets plus

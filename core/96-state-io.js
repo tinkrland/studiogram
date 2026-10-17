@@ -40,6 +40,8 @@ async function applyFullState(raw, opts = {}) {
   if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
   st.subject = st.subject === "bust" ? "bust" : "hand"; // pre-bust saves stay on the hand
   st.bust = migrateBust(st.bust);
+  // moves: the choreography is an ordered list; anything malformed drops out
+  st.moves = (Array.isArray(st.moves) ? st.moves : []).map(sanitizeMove);
   // props: background set dressing with per-prop provenance; unknown kinds
   // (library entries the running artifact doesn't carry) drop out
   st.props = (Array.isArray(st.props) ? st.props : [])

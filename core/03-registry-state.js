@@ -150,6 +150,7 @@ function defaultState() {
     hand: defaultHand(),
     bust: defaultBust(),
     pose: defaultPose(),
+    moves: [],    // take choreography: ordered finger moves played during a take
     jewelry: [],
   props: [],
     lighting: defaultLights(),

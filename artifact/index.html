@@ -865,6 +865,7 @@ function defaultState() {
     hand: defaultHand(),
     bust: defaultBust(),
     pose: defaultPose(),
+    moves: [],    // take choreography: ordered finger moves played during a take
     jewelry: [],
   props: [],
     lighting: defaultLights(),
@@ -3927,8 +3928,189 @@ function renderPosePanel() {
   slider(wrist, "pitch", -20, 20, 0.5, () => S.pose.wrist.pitch, (v) => { S.pose.wrist.pitch = v; }, { apply: () => applyPose(), fmt: (v) => v.toFixed(0) });
   slider(wrist, "yaw", -25, 25, 0.5, () => S.pose.wrist.yaw, (v) => { S.pose.wrist.yaw = v; }, { apply: () => applyPose(), fmt: (v) => v.toFixed(0) });
   slider(wrist, "roll", -30, 30, 0.5, () => S.pose.wrist.roll, (v) => { S.pose.wrist.roll = v; }, { apply: () => applyPose(), fmt: (v) => v.toFixed(0) });
+
+  // moves: the take choreography. an ordered list of finger moves that
+  // plays during a take (and rehearses live with the preview button):
+  // after its delay, a move eases its value to the target. the list is
+  // state, so the same choreography re-renders the same take.
+  const moves = section(PANEL, "moves");
+  hint(moves, "choreography for takes: each move eases one finger value after its delay, in list order. play it live with the preview, or hit record and it runs on the take's clock.");
+  S.moves.forEach((m, i) => {
+    const row = el("div", "row");
+    const num = el("span", "pill");
+    num.textContent = (i + 1) + ".";
+    row.appendChild(num);
+    const fsel = el("select");
+    for (const f of MOVE_FINGERS) {
+      const o = el("option"); o.value = f; o.textContent = f;
+      if (m.finger === f) o.selected = true;
+      fsel.appendChild(o);
+    }
+    fsel.addEventListener("change", () => { S.moves[i] = sanitizeMove({ ...m, finger: fsel.value }, i); saveState(); renderPosePanel(); });
+    row.appendChild(fsel);
+    const wsel = el("select");
+    for (const w of MOVE_WHATS[fsel.value] || ["curl"]) {
+      const o = el("option"); o.value = w; o.textContent = w;
+      if (m.what === w) o.selected = true;
+      wsel.appendChild(o);
+    }
+    wsel.addEventListener("change", () => { S.moves[i] = sanitizeMove({ ...m, what: wsel.value }, i); saveState(); renderPosePanel(); });
+    row.appendChild(wsel);
+    const tIn = el("input");
+    tIn.type = "number"; tIn.min = 0; tIn.max = MOVE_T_MAX; tIn.step = 0.5; tIn.value = m.t;
+    tIn.title = "seconds after record start";
+    tIn.addEventListener("change", () => { S.moves[i] = sanitizeMove({ ...m, t: +tIn.value }, i); saveState(); renderPosePanel(); });
+    row.appendChild(tIn);
+    const toS = el("span", "pill"); toS.textContent = "to"; row.appendChild(toS);
+    const toIn = el("input");
+    toIn.type = "range"; toIn.min = 0; toIn.max = 1; toIn.step = 0.05; toIn.value = m.to;
+    toIn.addEventListener("input", () => { S.moves[i].to = +toIn.value; saveState(); });
+    row.appendChild(toIn);
+    const ovIn = el("input");
+    ovIn.type = "range"; ovIn.min = 0.2; ovIn.max = MOVE_OVER_MAX; ovIn.step = 0.1; ovIn.value = m.over;
+    ovIn.title = "ease duration (s)";
+    ovIn.addEventListener("input", () => { S.moves[i].over = +ovIn.value; saveState(); });
+    row.appendChild(ovIn);
+    const up = button(row, "up", "btn sm", () => { if (i > 0) { const t = S.moves[i - 1]; S.moves[i - 1] = S.moves[i]; S.moves[i] = t; saveState(); renderPosePanel(); } });
+    const dn = button(row, "down", "btn sm", () => { if (i < S.moves.length - 1) { const t = S.moves[i + 1]; S.moves[i + 1] = S.moves[i]; S.moves[i] = t; saveState(); renderPosePanel(); } });
+    const rm = button(row, "remove", "btn sm danger", () => { S.moves.splice(i, 1); saveState(); renderPosePanel(); });
+    up.title = dn.title = rm.title = "";
+    moves.appendChild(row);
+  });
+  const mrow = el("div", "btnrow");
+  button(mrow, "+ add move", "btn", () => {
+    const last = S.moves[S.moves.length - 1];
+    S.moves.push(sanitizeMove({ id: "m" + Date.now().toString(36), finger: "index", what: "curl", t: last ? last.t + last.over + 1 : 2, to: 0.8, over: 0.8 }, S.moves.length));
+    saveState(); renderPosePanel();
+  });
+  button(mrow, MOVES.playing ? "stop preview" : "preview moves", "btn", () => {
+    if (MOVES.playing) stopMoves(true); else previewMoves();
+    renderPosePanel();
+  });
+  moves.appendChild(mrow);
 }
 
+// ===== moves: take choreography =====
+// an ordered list of finger moves the hand performs during a take: after a
+// delay from record start, one value (a curl, a spread, thumb opposition)
+// eases to its target over a duration. the list is state; evaluation is a
+// pure function of (base pose, moves, t), so the same list re-renders the
+// same motion — the export path captures pose as per-frame deltas exactly
+// the way it captures lighting, and applies them the same way.
+//
+// outside a take or a preview, the pose stays manual: the sliders are the
+// pose, the moves are the choreography that plays on top of it.
+
+const MOVE_FINGERS = ["index", "middle", "ring", "pinky", "thumb"];
+const MOVE_WHATS = { index: ["curl", "spread"], middle: ["curl", "spread"], ring: ["curl", "spread"], pinky: ["curl", "spread"], thumb: ["curl", "opposition"] };
+const MOVE_T_MAX = 30, MOVE_OVER_MAX = 3;
+
+function sanitizeMove(m, i) {
+  const finger = MOVE_FINGERS.includes(m.finger) ? m.finger : "index";
+  const what = (MOVE_WHATS[finger] || ["curl"]).includes(m.what) ? m.what : "curl";
+  const t = Math.max(0, Math.min(MOVE_T_MAX, +m.t || 0));
+  const to = Math.max(0, Math.min(1, +m.to || 0));
+  const over = Math.max(0.1, Math.min(MOVE_OVER_MAX, +m.over || 0.8));
+  return { id: typeof m.id === "string" ? m.id : "m" + i + "_" + Math.floor(t * 10), finger, what, t, to, over };
+}
+
+function clonePose(p) { return JSON.parse(JSON.stringify(p)); }
+
+// the value a move targets, read from a pose
+function readMoveValue(p, finger, what) {
+  if (finger === "thumb") return p.thumb[what] || 0;
+  return (p.fingers[finger] || {})[what] || 0;
+}
+function writeMoveValue(p, finger, what, v) {
+  if (finger === "thumb") { p.thumb[what] = v; return; }
+  if (!p.fingers[finger]) p.fingers[finger] = { curl: 0, spread: 0 };
+  p.fingers[finger][what] = v;
+}
+
+function easeMove(k) { return k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; } // easeInOutCubic
+
+// pure evaluation: the pose the hand should hold t seconds into a take.
+// moves chain in list order — a move eases from wherever the target is when
+// it starts (the previous move's end, or the base pose) to its own target.
+function poseAt(base, moves, t) {
+  const p = clonePose(base);
+  // keyframes per target, in list order
+  const seq = {};
+  for (const m of moves) {
+    const k = m.finger + ":" + m.what;
+    (seq[k] = seq[k] || []).push(m);
+  }
+  for (const k of Object.keys(seq)) {
+    const [finger, what] = k.split(":");
+    let v = readMoveValue(base, finger, what);
+    for (const m of seq[k]) {
+      if (t <= m.t) break;                        // not started yet: hold
+      const kk = Math.min(1, (t - m.t) / m.over);
+      const target = m.to;
+      v = v + (target - v) * easeMove(kk);        // from = running value
+    }
+    writeMoveValue(p, finger, what, v);
+  }
+  return p;
+}
+
+// the live timeline: playing during a take or a preview, driven from the
+// record sampler (or the preview loop). the base pose is captured at play
+// start so the take never mutates the saved pose.
+const MOVES = { base: null, t0: 0, playing: false, raf: null, onFrame: null, mode: "preview" };
+
+function movesDuration(moves) {
+  let end = 0;
+  for (const m of moves) end = Math.max(end, m.t + m.over);
+  return end;
+}
+
+function movesTick(now) {
+  if (!MOVES.playing || !S.moves.length) return false;
+  const t = (now - MOVES.t0) / 1000;
+  const next = poseAt(MOVES.base, S.moves, t);
+  // write only the targets the choreography owns; everything else is the
+  // base pose, untouched
+  for (const m of S.moves) writeMoveValue(S.pose, m.finger, m.what, readMoveValue(next, m.finger, m.what));
+  applyPose();
+  if (MOVES.onFrame) MOVES.onFrame(t);
+  // natural end: a preview is a rehearsal and hands the pose back; a take
+  // holds the choreography's final pose until recording stops
+  if (t >= movesDuration(S.moves) + 0.25) stopMoves(MOVES.mode === "preview");
+  return true;
+}
+
+function playMoves(fromMs) {
+  MOVES.mode = "take";                  // caller may flip it back to preview
+  MOVES.base = clonePose(S.pose);
+  MOVES.t0 = fromMs || performance.now();
+  MOVES.playing = true;
+}
+
+function stopMoves(restoreBase) {
+  MOVES.playing = false;
+  if (MOVES.raf) { clearInterval(MOVES.raf); cancelAnimationFrame(MOVES.raf); MOVES.raf = null; }
+  if (MOVES.onFrame) MOVES.onFrame = null;
+  if (restoreBase && MOVES.base) { S.pose = clonePose(MOVES.base); applyPose(); }
+  MOVES.base = null;
+}
+
+// the preview loop: plays the choreography live, outside any take, so it can
+// be rehearsed before recording. restores the pose it started from.
+function previewMoves() {
+  if (MOVES.playing || !S.moves.length) return;
+  playMoves();
+  MOVES.mode = "preview";
+  // an interval, not rAF: the preview must keep stepping even when the
+  // compositor is quiet (headless checks, background tabs); the take path
+  // drives the same tick from the recorder's own clock
+  MOVES.raf = setInterval(() => {
+    if (!MOVES.playing) { stopMoves(); return; }
+    movesTick(performance.now());
+  }, 33);
+  const secs = movesDuration(S.moves);
+  toast("previewing " + S.moves.length + " moves (" + Math.ceil(secs) + "s). the pose returns when it ends.");
+}
 // ----- camera panel -----
 function renderCameraPanel() {
   PANEL.innerHTML = "";
@@ -4464,7 +4646,9 @@ async function exportCaptureSet() {
 // socmed-integration/95-captures.js, which loads first
 const VIDEO_FPS = 30;
 const VIDEO_MAX_MS = 30000;
-const RECORD_TAKES = new Map();  // recording id -> live take object url (memory only, never state)
+const RECORD_TAKES = new Map();
+let RETAKE = null;   // the take whose hand motion replays while the camera, lighting
+                     // and backdrop are driven fresh: same action, new camera  // recording id -> live take object url (memory only, never state)
 let REC = null;                   // the active take
 let VIEW_LOCKED = false;          // export and replay own the canvas while locked
 
@@ -4492,6 +4676,10 @@ function startRecording() {
     state_hash: null,
   };
   sha256hex(REC.snapshot).then((h) => { if (REC) REC.state_hash = h; });
+  // the choreography begins with the take, unless a retake owns the motion
+  if (RETAKE) { MOVES.base = JSON.parse(JSON.stringify(S.pose)); MOVES.playing = false; }
+  else if (S.moves.length) playMoves(REC.t0);   // the choreography plays on the take's clock
+  else { MOVES.base = JSON.parse(JSON.stringify(S.pose)); MOVES.playing = false; }
   // the live take: the browser's native canvas capture. preview quality
   // only; exports never come from this stream.
   try {
@@ -4505,6 +4693,7 @@ function startRecording() {
   } catch (e) { /* no mediarecorder: the path is still recorded, exports still work */ }
   let lastLighting = canonical(S.lighting);
   let lastEnvironment = canonical(S.environment);
+  let lastPose = canonical(S.pose);
   let lastSizeKey = null;
   const sample = () => {
     if (!REC) return;
@@ -4514,12 +4703,23 @@ function startRecording() {
       target: [round(controls.target.x), round(controls.target.y), round(controls.target.z)],
       fov: round(camera.fov),
     };
-    // lighting is captured as deltas: a frame carries the lighting values
-    // only when they changed, so a 30s take costs a few dozen entries
+    // the choreography runs on the take's clock, before the frame is read
+    movesTick(performance.now());
+    // pose rides the same delta pattern as lighting: a frame carries the
+    // pose only when a move changed it, so the export re-renders the motion
+    if (RETAKE) {
+      S.pose = replayPoseAt(RETAKE, performance.now() - REC.t0, REC.snapshot.pose);
+      applyPose();
+    }
+    const nowPose = canonical(S.pose);
     const nowLighting = canonical(S.lighting);
     if (nowLighting !== lastLighting) {
       lastLighting = nowLighting;
       frame.lighting = JSON.parse(JSON.stringify(S.lighting));
+    }
+    if (nowPose !== lastPose) {
+      lastPose = nowPose;
+      frame.pose = JSON.parse(JSON.stringify(S.pose));
     }
     // the backdrop is captured the same way: only the frames where it
     // changed carry it, so a set change mid-take survives the export
@@ -4658,6 +4858,44 @@ function videoSizeAt(rec, i) {
   return size;
 }
 
+// the take's pose channel: frames that carry a pose snapshot, in take
+// order. this is the hand's motion as recorded — scripted moves and manual
+// slider changes both land here, because the sampler captures pose whenever
+// it changes.
+function poseFrames(rec) {
+  return rec.path.filter((f) => f.pose);
+}
+
+// the pose at a take-relative time, carried forward from the last keyframe
+// and eased toward the next. pure: the same frames and the same clock read
+// the same pose, so a retake replays the motion byte-for-byte.
+function replayPoseAt(rec, tMs, basePose) {
+  const frames = poseFrames(rec);
+  if (!frames.length) return basePose;
+  let prev = null, next = null;
+  for (const f of frames) {
+    if (f.t <= tMs) prev = f;
+    else { next = f; break; }
+  }
+  if (!prev) return basePose;              // before the first motion: the opening pose
+  if (!next) return prev.pose;             // after the last motion: it holds
+  const k = (tMs - prev.t) / Math.max(next.t - prev.t, 1);
+  return lerpPose(prev.pose, next.pose, k);
+}
+
+// numeric lerp over the pose tree; strings (the preset name) carry from the
+// nearest keyframe. deterministic by construction.
+function lerpPose(a, b, k) {
+  if (typeof a === "number" && typeof b === "number") return a + (b - a) * k;
+  if (a && typeof a === "object" && b && typeof b === "object") {
+    const out = Array.isArray(a) ? [] : {};
+    for (const key of Object.keys(a)) out[key] = lerpPose(a[key], b[key] !== undefined ? b[key] : a[key], k);
+    for (const key of Object.keys(b)) if (!(key in out)) out[key] = b[key];
+    return out;
+  }
+  return k < 0.5 ? a : b;
+}
+
 // the effective lighting at a path frame, carried forward from the last
 // change at or before it. this is what export applies before rendering.
 function pathLightingAt(rec, i) {
@@ -4667,6 +4905,9 @@ function pathLightingAt(rec, i) {
 }
 
 function stopRecording() {
+  // a take is ephemeral: the choreography's pose ends with it
+  stopMoves(true);
+  RETAKE = null;
   if (!REC) return null;
   const duration_ms = performance.now() - REC.t0;
   if (REC.raf) cancelAnimationFrame(REC.raf);
@@ -4767,6 +5008,7 @@ async function renderVideoBuffer(rec, fmt) {
       camera.updateProjectionMatrix();
       // a lighting change captured mid-take is part of the performance
       if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+      if (k.pose) { S.pose = JSON.parse(JSON.stringify(k.pose)); applyPose(); }
       // and so is a set change: the backdrop is re-rendered as the take played it
       if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
       renderFrame();
@@ -4844,6 +5086,7 @@ async function replayVideo(rec) {
         camera.fov = k.fov;
         camera.updateProjectionMatrix();
         if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+        if (k.pose) { S.pose = JSON.parse(JSON.stringify(k.pose)); applyPose(); }
         if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
         renderFrame();
         if (t >= rec.duration_ms || i >= rec.path.length - 1) return resolve();
@@ -4864,6 +5107,19 @@ function deleteRecording(rec) {
   const url = RECORD_TAKES.get(rec.id);
   if (url) { URL.revokeObjectURL(url); RECORD_TAKES.delete(rec.id); }
   renderCaptureStrip(); saveState();
+}
+
+// a retake: the take's recorded hand motion replays on the new take's
+// clock while the camera, lighting and backdrop are driven fresh — same
+// action, new camera. the new take captures the replayed motion, so it
+// re-renders deterministically like any other.
+function startRetake(rec) {
+  if (REC) { toast("stop the current take first"); return; }
+  if (!poseFrames(rec).length) { toast("that take recorded no hand motion"); return; }
+  RETAKE = rec;
+  startRecording();
+  const badge = document.querySelector("#vidrow .cc-meta");
+  if (badge) badge.textContent = `recording… retake of ${rec.name} · motion replays, camera stays live`;
 }
 
 // the recordings sit in the capture bar under the photo strip. a live
@@ -4890,6 +5146,7 @@ function renderVideoStrip() {
     const mk = (label, fn, cls) => { const b = el("button", cls || "btn mini", label); b.addEventListener("click", fn); return b; };
     actions.append(
       mk("replay", () => replayVideo(rec)),
+      mk("retake", () => startRetake(rec)),
       mk("mp4", () => exportVideo(rec, "mp4")),
       mk("mov", () => exportVideo(rec, "mov")),
       mk("webm", () => exportVideo(rec, "webm")),
@@ -4957,6 +5214,8 @@ async function applyFullState(raw, opts = {}) {
   if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
   st.subject = st.subject === "bust" ? "bust" : "hand"; // pre-bust saves stay on the hand
   st.bust = migrateBust(st.bust);
+  // moves: the choreography is an ordered list; anything malformed drops out
+  st.moves = (Array.isArray(st.moves) ? st.moves : []).map(sanitizeMove);
   // props: background set dressing with per-prop provenance; unknown kinds
   // (library entries the running artifact doesn't carry) drop out
   st.props = (Array.isArray(st.props) ? st.props : [])
@@ -5137,6 +5396,54 @@ async function runSelfTest() {
     const g2 = scene.getObjectByName("props");
     if (g2) g2.traverse((o) => { if (o.isMesh) remaining++; });
     results.push("props clear with state: " + (remaining === 0));
+  }
+
+  // moves: the take choreography. evaluation is pure, so the same list
+  // re-renders the same motion; a move eases from wherever its target is.
+  {
+    const base = defaultPose();
+    const moves = [
+      sanitizeMove({ id: "m1", finger: "index", what: "curl", t: 2, to: 0.8, over: 1 }, 0),
+      sanitizeMove({ id: "m2", finger: "index", what: "curl", t: 6, to: 0.2, over: 1 }, 1),
+      sanitizeMove({ id: "m3", finger: "thumb", what: "opposition", t: 4, to: 0.9, over: 0.8 }, 2)
+    ];
+    const p1 = poseAt(base, moves, 2.5), p2 = poseAt(base, moves, 2.5);
+    const det = JSON.stringify(p1) === JSON.stringify(p2);
+    const early = poseAt(base, moves, 1.0).fingers.index.curl;       // before the first move: base
+    const mid = p1.fingers.index.curl;                                // mid-transition: between base and target
+    const held = poseAt(base, moves, 5.5).fingers.index.curl;          // after move 1, before move 2
+    const late = poseAt(base, moves, 9).fingers.index.curl;           // after move 2: the second target
+    const thumbLate = poseAt(base, moves, 9).thumb.opposition;       // a different target rides its own line
+    results.push("moves evaluate pure and ordered: " + (det && early === 0 && mid > 0 && mid < 0.8 && Math.abs(held - 0.8) < 0.01 && Math.abs(late - 0.2) < 0.01 && Math.abs(thumbLate - 0.9) < 0.01) +
+      " (base -> mid " + mid.toFixed(2) + " -> held " + held.toFixed(2) + " -> " + late.toFixed(2) + ", thumb " + thumbLate.toFixed(2) + ")");
+    const ser = serializeState();
+    results.push("moves serialize with state: " + (Array.isArray(ser.moves) && ser.moves.length === 0));
+    // the retake channel: a take's recorded hand motion replays on a new
+    // take's clock while the camera is driven fresh. pure, so deterministic.
+    const rrec = { path: [
+      { t: 1000, pose: JSON.parse(JSON.stringify(S.pose)) },
+      { t: 2000, pose: JSON.parse(JSON.stringify({ ...S.pose, fingers: { ...S.pose.fingers, index: { curl: 1, spread: 0 } } })) },
+      { t: 4000, pose: JSON.parse(JSON.stringify({ ...S.pose, fingers: { ...S.pose.fingers, index: { curl: 0, spread: 0 }, middle: { curl: 1, spread: 0 } } })) },
+    ] };
+    const rbase = JSON.parse(JSON.stringify(S.pose));
+    const rearly = replayPoseAt(rrec, 500, rbase).fingers.index.curl;
+    const rmid = replayPoseAt(rrec, 1500, rbase).fingers.index.curl;
+    const rheld = replayPoseAt(rrec, 2000, rbase).fingers.index.curl;   // at the keyframe: exactly its value
+    const rlate = replayPoseAt(rrec, 5000, rbase).fingers;
+    const rdet = replayPoseAt(rrec, 1500, rbase).fingers.index.curl === rmid;
+    const bcurl = rbase.fingers.index.curl;
+    results.push("retake channel replays pure: " +
+      (rearly === bcurl && Math.abs(rmid - (bcurl + 0.5 * (1 - bcurl))) < 0.01 && Math.abs(rheld - 1) < 0.01 && rlate.index.curl === 0 && rlate.middle.curl === 1 && rdet) +
+      " (base -> mid " + rmid.toFixed(2) + " -> held 1.00 -> final index 0, middle 1)");
+    results.push("retake without motion returns the base: " + (replayPoseAt({ path: [{ t: 0 }, { t: 2000 }] }, 1000, rbase) === rbase));
+    S.moves = moves;
+    playMoves(performance.now() - 5500);     // t = 5.5s: move 1 held, move 3 held, move 2 not started
+    movesTick(performance.now());
+    const applied = Math.abs(S.pose.fingers.index.curl - 0.8) < 0.01 && Math.abs(S.pose.thumb.opposition - 0.9) < 0.01;
+    stopMoves(true);                          // the base pose returns
+    const restored = S.pose.fingers.index.curl === 0 && S.moves.length === 3;
+    S.moves = [];
+    results.push("timeline drives the live pose and restores the base: " + (applied && restored));
   }
 
   // stacking: a second piece at the same location auto-stacks, then a reorder
@@ -5630,7 +5937,7 @@ async function runSceneAudit() {
   if (location.hash.includes("audit")) setTimeout(runSceneAudit, 9000);
   // qa handle: the visual check scripts (scripts/nail-sheet.mjs) reach the
   // module-scoped scene through this, only when the url asks for it
-  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER, settleChain, ringLookup, NECK_RINGS, DRAPE, BUST };
+  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER, settleChain, ringLookup, NECK_RINGS, DRAPE, BUST, poseAt, sanitizeMove, MOVES, playMoves, stopMoves, movesTick, previewMoves, startRetake, stopRecording, get REC() { return REC; }, replayPoseAt, renderCaptureStrip };
   renderCaptureStrip();
   updateVpOverlay();
   syncModeBadge();

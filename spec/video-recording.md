@@ -151,3 +151,22 @@ recording: {
 - ui: the record button, dimension selector, countdown, framing
   overlay, and the three export buttons render without overlapping the
   capture strip; the artifact stays one deterministic file.
+## take choreography and retakes (v3, 2026-10-17)
+
+- moves (`S.moves`): an ordered choreography list — { finger, what, t (seconds
+  after record start), to (0..1), over (ease seconds) }. poseAt(base, moves, t)
+  is a pure evaluator: keyframes chain in list order, ease-in-out between them,
+  values hold after their transition. same list + same clock = same motion.
+- a take captures the pose channel the way it captures lighting: a frame
+  carries a pose snapshot only when canonical(S.pose) changed, so scripted
+  moves AND manual mid-take slider changes both land in the path.
+- retake: a take card's retake button replays that take's recorded hand
+  motion on a new take's clock while the camera, lighting, and backdrop are
+  driven fresh — same action, new camera. the new take captures the replayed
+  motion, so it re-renders deterministically like any other. takes with no
+  pose channel are refused with a toast.
+- the pose a take starts from is restored when it ends (a preview is a
+  rehearsal, not a pose edit); during a take the final choreography pose holds
+  until stopRecording restores the base.
+- selftest: poseAt purity/ordering, live drive + restore, serialize;
+  replayPoseAt carry/lerp/hold determinism, the no-motion refusal path.

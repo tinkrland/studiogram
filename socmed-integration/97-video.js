@@ -16,7 +16,9 @@
 // socmed-integration/95-captures.js, which loads first
 const VIDEO_FPS = 30;
 const VIDEO_MAX_MS = 30000;
-const RECORD_TAKES = new Map();  // recording id -> live take object url (memory only, never state)
+const RECORD_TAKES = new Map();
+let RETAKE = null;   // the take whose hand motion replays while the camera, lighting
+                     // and backdrop are driven fresh: same action, new camera  // recording id -> live take object url (memory only, never state)
 let REC = null;                   // the active take
 let VIEW_LOCKED = false;          // export and replay own the canvas while locked
 
@@ -44,6 +46,10 @@ function startRecording() {
     state_hash: null,
   };
   sha256hex(REC.snapshot).then((h) => { if (REC) REC.state_hash = h; });
+  // the choreography begins with the take, unless a retake owns the motion
+  if (RETAKE) { MOVES.base = JSON.parse(JSON.stringify(S.pose)); MOVES.playing = false; }
+  else if (S.moves.length) playMoves(REC.t0);   // the choreography plays on the take's clock
+  else { MOVES.base = JSON.parse(JSON.stringify(S.pose)); MOVES.playing = false; }
   // the live take: the browser's native canvas capture. preview quality
   // only; exports never come from this stream.
   try {
@@ -57,6 +63,7 @@ function startRecording() {
   } catch (e) { /* no mediarecorder: the path is still recorded, exports still work */ }
   let lastLighting = canonical(S.lighting);
   let lastEnvironment = canonical(S.environment);
+  let lastPose = canonical(S.pose);
   let lastSizeKey = null;
   const sample = () => {
     if (!REC) return;
@@ -66,12 +73,23 @@ function startRecording() {
       target: [round(controls.target.x), round(controls.target.y), round(controls.target.z)],
       fov: round(camera.fov),
     };
-    // lighting is captured as deltas: a frame carries the lighting values
-    // only when they changed, so a 30s take costs a few dozen entries
+    // the choreography runs on the take's clock, before the frame is read
+    movesTick(performance.now());
+    // pose rides the same delta pattern as lighting: a frame carries the
+    // pose only when a move changed it, so the export re-renders the motion
+    if (RETAKE) {
+      S.pose = replayPoseAt(RETAKE, performance.now() - REC.t0, REC.snapshot.pose);
+      applyPose();
+    }
+    const nowPose = canonical(S.pose);
     const nowLighting = canonical(S.lighting);
     if (nowLighting !== lastLighting) {
       lastLighting = nowLighting;
       frame.lighting = JSON.parse(JSON.stringify(S.lighting));
+    }
+    if (nowPose !== lastPose) {
+      lastPose = nowPose;
+      frame.pose = JSON.parse(JSON.stringify(S.pose));
     }
     // the backdrop is captured the same way: only the frames where it
     // changed carry it, so a set change mid-take survives the export
@@ -210,6 +228,44 @@ function videoSizeAt(rec, i) {
   return size;
 }
 
+// the take's pose channel: frames that carry a pose snapshot, in take
+// order. this is the hand's motion as recorded — scripted moves and manual
+// slider changes both land here, because the sampler captures pose whenever
+// it changes.
+function poseFrames(rec) {
+  return rec.path.filter((f) => f.pose);
+}
+
+// the pose at a take-relative time, carried forward from the last keyframe
+// and eased toward the next. pure: the same frames and the same clock read
+// the same pose, so a retake replays the motion byte-for-byte.
+function replayPoseAt(rec, tMs, basePose) {
+  const frames = poseFrames(rec);
+  if (!frames.length) return basePose;
+  let prev = null, next = null;
+  for (const f of frames) {
+    if (f.t <= tMs) prev = f;
+    else { next = f; break; }
+  }
+  if (!prev) return basePose;              // before the first motion: the opening pose
+  if (!next) return prev.pose;             // after the last motion: it holds
+  const k = (tMs - prev.t) / Math.max(next.t - prev.t, 1);
+  return lerpPose(prev.pose, next.pose, k);
+}
+
+// numeric lerp over the pose tree; strings (the preset name) carry from the
+// nearest keyframe. deterministic by construction.
+function lerpPose(a, b, k) {
+  if (typeof a === "number" && typeof b === "number") return a + (b - a) * k;
+  if (a && typeof a === "object" && b && typeof b === "object") {
+    const out = Array.isArray(a) ? [] : {};
+    for (const key of Object.keys(a)) out[key] = lerpPose(a[key], b[key] !== undefined ? b[key] : a[key], k);
+    for (const key of Object.keys(b)) if (!(key in out)) out[key] = b[key];
+    return out;
+  }
+  return k < 0.5 ? a : b;
+}
+
 // the effective lighting at a path frame, carried forward from the last
 // change at or before it. this is what export applies before rendering.
 function pathLightingAt(rec, i) {
@@ -219,6 +275,9 @@ function pathLightingAt(rec, i) {
 }
 
 function stopRecording() {
+  // a take is ephemeral: the choreography's pose ends with it
+  stopMoves(true);
+  RETAKE = null;
   if (!REC) return null;
   const duration_ms = performance.now() - REC.t0;
   if (REC.raf) cancelAnimationFrame(REC.raf);
@@ -319,6 +378,7 @@ async function renderVideoBuffer(rec, fmt) {
       camera.updateProjectionMatrix();
       // a lighting change captured mid-take is part of the performance
       if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+      if (k.pose) { S.pose = JSON.parse(JSON.stringify(k.pose)); applyPose(); }
       // and so is a set change: the backdrop is re-rendered as the take played it
       if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
       renderFrame();
@@ -396,6 +456,7 @@ async function replayVideo(rec) {
         camera.fov = k.fov;
         camera.updateProjectionMatrix();
         if (k.lighting) { S.lighting = JSON.parse(JSON.stringify(k.lighting)); applyLighting(); }
+        if (k.pose) { S.pose = JSON.parse(JSON.stringify(k.pose)); applyPose(); }
         if (k.environment) { S.environment = JSON.parse(JSON.stringify(k.environment)); applyEnvironment(); }
         renderFrame();
         if (t >= rec.duration_ms || i >= rec.path.length - 1) return resolve();
@@ -416,6 +477,19 @@ function deleteRecording(rec) {
   const url = RECORD_TAKES.get(rec.id);
   if (url) { URL.revokeObjectURL(url); RECORD_TAKES.delete(rec.id); }
   renderCaptureStrip(); saveState();
+}
+
+// a retake: the take's recorded hand motion replays on the new take's
+// clock while the camera, lighting and backdrop are driven fresh — same
+// action, new camera. the new take captures the replayed motion, so it
+// re-renders deterministically like any other.
+function startRetake(rec) {
+  if (REC) { toast("stop the current take first"); return; }
+  if (!poseFrames(rec).length) { toast("that take recorded no hand motion"); return; }
+  RETAKE = rec;
+  startRecording();
+  const badge = document.querySelector("#vidrow .cc-meta");
+  if (badge) badge.textContent = `recording… retake of ${rec.name} · motion replays, camera stays live`;
 }
 
 // the recordings sit in the capture bar under the photo strip. a live
@@ -442,6 +516,7 @@ function renderVideoStrip() {
     const mk = (label, fn, cls) => { const b = el("button", cls || "btn mini", label); b.addEventListener("click", fn); return b; };
     actions.append(
       mk("replay", () => replayVideo(rec)),
+      mk("retake", () => startRetake(rec)),
       mk("mp4", () => exportVideo(rec, "mp4")),
       mk("mov", () => exportVideo(rec, "mov")),
       mk("webm", () => exportVideo(rec, "webm")),

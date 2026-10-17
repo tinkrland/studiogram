@@ -100,6 +100,54 @@ async function runSelfTest() {
     results.push("props clear with state: " + (remaining === 0));
   }
 
+  // moves: the take choreography. evaluation is pure, so the same list
+  // re-renders the same motion; a move eases from wherever its target is.
+  {
+    const base = defaultPose();
+    const moves = [
+      sanitizeMove({ id: "m1", finger: "index", what: "curl", t: 2, to: 0.8, over: 1 }, 0),
+      sanitizeMove({ id: "m2", finger: "index", what: "curl", t: 6, to: 0.2, over: 1 }, 1),
+      sanitizeMove({ id: "m3", finger: "thumb", what: "opposition", t: 4, to: 0.9, over: 0.8 }, 2)
+    ];
+    const p1 = poseAt(base, moves, 2.5), p2 = poseAt(base, moves, 2.5);
+    const det = JSON.stringify(p1) === JSON.stringify(p2);
+    const early = poseAt(base, moves, 1.0).fingers.index.curl;       // before the first move: base
+    const mid = p1.fingers.index.curl;                                // mid-transition: between base and target
+    const held = poseAt(base, moves, 5.5).fingers.index.curl;          // after move 1, before move 2
+    const late = poseAt(base, moves, 9).fingers.index.curl;           // after move 2: the second target
+    const thumbLate = poseAt(base, moves, 9).thumb.opposition;       // a different target rides its own line
+    results.push("moves evaluate pure and ordered: " + (det && early === 0 && mid > 0 && mid < 0.8 && Math.abs(held - 0.8) < 0.01 && Math.abs(late - 0.2) < 0.01 && Math.abs(thumbLate - 0.9) < 0.01) +
+      " (base -> mid " + mid.toFixed(2) + " -> held " + held.toFixed(2) + " -> " + late.toFixed(2) + ", thumb " + thumbLate.toFixed(2) + ")");
+    const ser = serializeState();
+    results.push("moves serialize with state: " + (Array.isArray(ser.moves) && ser.moves.length === 0));
+    // the retake channel: a take's recorded hand motion replays on a new
+    // take's clock while the camera is driven fresh. pure, so deterministic.
+    const rrec = { path: [
+      { t: 1000, pose: JSON.parse(JSON.stringify(S.pose)) },
+      { t: 2000, pose: JSON.parse(JSON.stringify({ ...S.pose, fingers: { ...S.pose.fingers, index: { curl: 1, spread: 0 } } })) },
+      { t: 4000, pose: JSON.parse(JSON.stringify({ ...S.pose, fingers: { ...S.pose.fingers, index: { curl: 0, spread: 0 }, middle: { curl: 1, spread: 0 } } })) },
+    ] };
+    const rbase = JSON.parse(JSON.stringify(S.pose));
+    const rearly = replayPoseAt(rrec, 500, rbase).fingers.index.curl;
+    const rmid = replayPoseAt(rrec, 1500, rbase).fingers.index.curl;
+    const rheld = replayPoseAt(rrec, 2000, rbase).fingers.index.curl;   // at the keyframe: exactly its value
+    const rlate = replayPoseAt(rrec, 5000, rbase).fingers;
+    const rdet = replayPoseAt(rrec, 1500, rbase).fingers.index.curl === rmid;
+    const bcurl = rbase.fingers.index.curl;
+    results.push("retake channel replays pure: " +
+      (rearly === bcurl && Math.abs(rmid - (bcurl + 0.5 * (1 - bcurl))) < 0.01 && Math.abs(rheld - 1) < 0.01 && rlate.index.curl === 0 && rlate.middle.curl === 1 && rdet) +
+      " (base -> mid " + rmid.toFixed(2) + " -> held 1.00 -> final index 0, middle 1)");
+    results.push("retake without motion returns the base: " + (replayPoseAt({ path: [{ t: 0 }, { t: 2000 }] }, 1000, rbase) === rbase));
+    S.moves = moves;
+    playMoves(performance.now() - 5500);     // t = 5.5s: move 1 held, move 3 held, move 2 not started
+    movesTick(performance.now());
+    const applied = Math.abs(S.pose.fingers.index.curl - 0.8) < 0.01 && Math.abs(S.pose.thumb.opposition - 0.9) < 0.01;
+    stopMoves(true);                          // the base pose returns
+    const restored = S.pose.fingers.index.curl === 0 && S.moves.length === 3;
+    S.moves = [];
+    results.push("timeline drives the live pose and restores the base: " + (applied && restored));
+  }
+
   // stacking: a second piece at the same location auto-stacks, then a reorder
   // must exchange the two seat offsets exactly
   const first = S.jewelry[0];
@@ -591,7 +639,7 @@ async function runSceneAudit() {
   if (location.hash.includes("audit")) setTimeout(runSceneAudit, 9000);
   // qa handle: the visual check scripts (scripts/nail-sheet.mjs) reach the
   // module-scoped scene through this, only when the url asks for it
-  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER, settleChain, ringLookup, NECK_RINGS, DRAPE, BUST };
+  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER, settleChain, ringLookup, NECK_RINGS, DRAPE, BUST, poseAt, sanitizeMove, MOVES, playMoves, stopMoves, movesTick, previewMoves, startRetake, stopRecording, get REC() { return REC; }, replayPoseAt, renderCaptureStrip };
   renderCaptureStrip();
   updateVpOverlay();
   syncModeBadge();

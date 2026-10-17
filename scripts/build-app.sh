@@ -17,7 +17,7 @@ manifest = [
     "dollification/58-finish.js", "posing-studio/60-posing.js",
     "jewelry/70-jewelry.js",
     "core/80-panel-infra.js", "customized-hands/82-subject-panel.js", "bust/82-bust-panel.js",
-    "jewelry/84-jewelry-panel.js", "posing-studio/86-pose-panel.js",
+    "jewelry/84-jewelry-panel.js", "posing-studio/86-pose-panel.js", "posing-studio/87-moves.js",
     "camera/88-camera-panel.js", "lighting/90-light-panel.js",
     "setdesign/92-scene-panel.js", "core/93-panel-shell.js",
     "socmed-integration/95-captures.js",
