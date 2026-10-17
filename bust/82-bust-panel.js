@@ -101,7 +101,7 @@ function renderBustPanel() {
   }
 
   const neck = section(PANEL, "necklace");
-  hint(neck, "the drape is solved from the necklace length alone: cross-section shells carry the chain, the front dips only as far as the extra length allows.");
+  hint(neck, "the chain is a verlet settle: it falls under gravity, the resting shells push back, and the surplus hangs free. the pendant is weight that drags the droop. same length, same curve, every time.");
   const styles = [["none", "none"], ["choker", "choker (40cm)"], ["princess", "princess (46cm)"], ["custom", "custom length"]];
   selectControl(neck, "style", styles.map(([v, l]) => ({ value: v, label: l })),
     () => S.bust.necklace.style,

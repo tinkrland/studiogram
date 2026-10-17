@@ -45,6 +45,32 @@ async function runSelfTest() {
   results.push("magenta pixels in 400px render: " + magenta);
   results.push("skin pixels in 400px render: " + skin + " of " + total);
 
+  // nails ride the dorsal side: polish must show from the back of the hand
+  // and not from the palm (the first frames dressed the pad side instead)
+  {
+    const countPolish = async (fromZ) => {
+      camera.position.set(fromZ * 420, 260, fromZ > 0 ? 420 : -420);
+      camera.position.set(fromZ > 0 ? 180 : -180, 260, fromZ * 420);
+      controls.target.set(-15, 100, 40); controls.update(); renderFrame();
+      const png = await renderPng(400, 400);
+      const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = png; });
+      const cv = document.createElement("canvas"); cv.width = cv.height = 400;
+      const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, 400, 400).data;
+      let c = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] > 180 && d[i + 1] < 80 && d[i + 2] < 110) c++;
+      return c;
+    };
+    const keepStyle = S.hand.nails.style, keepColor = S.hand.nails.color;
+    S.hand.nails.style = "polished"; S.hand.nails.color = "#ff0040";
+    applyNails();
+    const dorsal = await countPolish(+1), palm = await countPolish(-1);
+    results.push("nails dorsal: " + (dorsal > 200 && palm < dorsal / 20) + " (dorsal view " + dorsal + " polish px, palm view " + palm + ")");
+    S.hand.nails.style = keepStyle; S.hand.nails.color = keepColor;
+    applyNails();
+    camera.position.set(...S.live.position); controls.target.set(...S.live.target);
+  }
+
   // stacking: a second piece at the same location auto-stacks, then a reorder
   // must exchange the two seat offsets exactly
   const first = S.jewelry[0];
@@ -295,11 +321,20 @@ async function runSelfTest() {
     S.bust.tone = { preset: "espresso", lightness: 0, warmth: 0, depth: 0 };
     applyBustTone();
     results.push("bust tone espresso: " + bustAlbedoHex() + " (expect #724932)");
-    const d1 = solveDrape(46), d2 = solveDrape(46), d3 = solveDrape(40), d4 = solveDrape(36);
-    results.push("drape 46cm sag: " + d1.sag.toFixed(4) + ", deterministic: " + (d1.sag === d2.sag) +
-      ", lengths order with depth: " + (d4.sag < d3.sag && d3.sag < d1.sag) +
-      " (" + d4.sag.toFixed(3) + " < " + d3.sag.toFixed(3) + " < " + d1.sag.toFixed(3) + ")");
-    results.push("drape length residual: " + Math.abs(necklaceLength(d1.pts) - 46 / 10.5).toExponential(1) + " glb units");
+    const s1 = settleChain(46, true), s2 = settleChain(46, true);
+    const eq = s1.pts.every((q, i) => q.equals(s2.pts[i]));
+    results.push("drape re-settle byte-identical (fixed-step verlet is deterministic): " + eq);
+    const bandHeld = Math.max(...s1.pts.map((q) => q.y));
+    results.push("worn band holds at the nape (friction owns the back arc): " + (Math.abs(bandHeld - 0.8) < 0.02) + " (band y " + bandHeld.toFixed(2) + ")");
+    const s3 = settleChain(40, false), s4 = settleChain(36, false);
+    const mean = (r) => r.pts.reduce((a, q) => a + q.y, 0) / r.pts.length;
+    results.push("drape deepens with length (mean depth 36 < 40 < 46): " + (mean(s4) > mean(s3) && mean(s3) > mean(s1)) +
+      " (" + mean(s4).toFixed(2) + " / " + mean(s3).toFixed(2) + " / " + mean(s1).toFixed(2) + ")");
+    let lo = 0;
+    for (let i = 1; i < s1.pts.length; i++) if (s1.pts[i].y < s1.pts[lo].y && s1.pts[i].z > 0) lo = i;
+    results.push("pendant rests at the low point of the droop: " +
+      (s1.pts[lo].y < s1.pts[(lo + 2) % s1.pts.length].y && s1.pts[lo].y < s1.pts[(lo - 2 + s1.pts.length * 2) % s1.pts.length].y) +
+      " (y " + s1.pts[lo].y.toFixed(2) + ")");
     buildNecklace();
     let links = 0; BUST.chainGroup.traverse((o) => { if (o.isMesh) links++; });
     let seats = 0; BUST.seatGroup.traverse((o) => { if (o.isMesh) seats++; });
@@ -527,7 +562,7 @@ async function runSceneAudit() {
   if (location.hash.includes("audit")) setTimeout(runSceneAudit, 9000);
   // qa handle: the visual check scripts (scripts/nail-sheet.mjs) reach the
   // module-scoped scene through this, only when the url asks for it
-  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER };
+  if (location.hash.includes("qa")) window.__sg = { get S() { return S; }, HAND, THREE, camera, controls, renderer, renderFrame, applyFinish, applyNails, NAIL_FRAME, NAIL_SHAPES, NAIL_SHAPE_ORDER, bname, FINGER_BONES, applyPosePreset, buildNailGeometry, NAIL, nailMaterial, applySurface, SKIN_PRESETS, skinAlbedoHex, migrateSkin, SKIN_GROUPS, skinAlbedo, NAIL_SHAPE_ORDER, settleChain, ringLookup, NECK_RINGS, DRAPE, BUST };
   renderCaptureStrip();
   updateVpOverlay();
   syncModeBadge();

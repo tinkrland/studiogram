@@ -17,7 +17,11 @@ for (const [bn, fn] of Object.entries(G.distal)) {
   const pts = G.boneVerts(ji).map((o) => o.p);
   const tip = Math.max(...pts.map((p) => p[1]));
   const zmax = Math.max(...pts.map((p) => p[2])), zmin = Math.min(...pts.map((p) => p[2]));
-  const s = Math.abs(zmax) >= Math.abs(zmin) ? 1 : -1;
+  // the dorsal side is the THINNER side of the phalanx: the nail bed rides
+  // tight over the bone, while the palm side carries the fleshy pad. the
+  // extent from the bone origin tells them apart (the first pass compared
+  // raw extents and dressed the pad — nails rendered on the palm).
+  const s = Math.abs(zmax) >= Math.abs(zmin) ? -1 : 1;
   const zone = pts.filter((p) => p[1] > tip - 0.012 && p[1] < tip - 0.002);
   const xs = zone.map((p) => p[0]);
   const xc = (Math.min(...xs) + Math.max(...xs)) / 2, w = (Math.max(...xs) - Math.min(...xs)) / 2;
