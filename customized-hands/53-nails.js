@@ -73,7 +73,7 @@ function nailMaterial() {
 // uses the chosen colour. the colour is a surface value, not a shape.
 function nailColor() {
   const n = S.hand.nails || {};
-  return n.style === "polished" ? (n.color || "#b23a48") : "#ecc9c0";
+  return n.style === "polished" ? (n.color || "#b23a48") : "#e9ded3"; // keratin: pale rosy ivory, not skin
 }
 
 // dorsal skin height at (x, y) in bone-local bind space, from the measured field
@@ -91,44 +91,73 @@ function dorsalHeight(fr, x, y) {
 // bone's local frame: x lateral, y along the finger toward the tip, z dorsal
 // (times fr.s, the dorsal sign).
 function buildNailGeometry(fr, shapeKey, length) {
+  // the plate is a keratin OBJECT, not paint on skin: it is stiff, so its
+  // top surface follows the finger's dorsal CENTERLINE (the bed's ridge)
+  // and carries its own transverse arch across; it never drapes the skin's
+  // side walls. it is a constant-ish thickness slab with a real edge, so it
+  // reads as a separate thing sitting on the finger. polish is lacquer over
+  // this plate, never a tint on skin.
   const shape = NAIL_SHAPES[shapeKey] || NAIL_SHAPES.oval;
   const NU = 29, NV = 30;
-  const halfW = fr.w * 0.78;                       // the plate is narrower than the finger
-  const bedBack = 0.0125;                          // plate base sits 12.5mm back from the tip
+  const halfW = fr.w * 0.78;
+  const bedBack = Math.max(0.008, (fr.phal || 0.02) * 0.62);
   const reach = shape.natural ? 0.0008 : NAIL_MAX_REACH * (fr.w / 0.0072) * (shape.lengthBoost || 1) * length;
-  const lift = 0.00028;                            // plate rides 0.28mm off the skin
+  const lift = 0.00035;                           // rides 0.35mm off the bed's ridge
+  const dome = 0.00055;                           // the plate's own arch across
+  // growth along the bed: the matrix extrudes the plate UNDER the proximal
+  // fold; over the sterile matrix the bed holds it flat along the BED PLANE
+  // (the fitted line), and at the distal groove (~2mm before the fingertip)
+  // the plate separates — it never follows the fingertip's rounding cap,
+  // it leaves along the bed's own line. the skin centerline acts only as a
+  // floor so the base tucks under the fold instead of sinking through it.
+  const topZ = (u, y) => {
+    const zLine = fr.bed.z + fr.bed.slope * (y - fr.tip);      // the bed plane
+    const zC = dorsalHeight(fr, fr.xc, Math.min(y, fr.tip));  // the skin floor
+    return Math.max(zLine, zC) + lift + dome * (1 - u * u);    // own arch across
+  };
+  // growth of nail height: the plate emerges thin from under the fold
+  // (~0.15mm at the matrix) and is fullest at the free edge (~0.5mm)
+  const thickAt = (v) => 0.00015 + 0.00035 * v;
+  // top + bottom grids, same topology; the rim closes them into a solid
   const verts = [], idx = [];
-  const bedFrac = bedBack / (bedBack + Math.max(reach, 1e-6));   // share of rows that lie on the bed
-  for (let r = 0; r < NV; r++) {
-    const v = r / (NV - 1);                        // 0 at the cuticle, 1 at the free end
-    const dist = v * (bedBack + reach);            // metres from the plate base
+  const pointAt = (r, c, side) => {                // side 0 = top, 1 = bottom
+    const v = r / (NV - 1);
+    const u = (c / (NU - 1)) * 2 - 1;
+    const dist = v * (bedBack + reach);
     const onBed = dist <= bedBack;
-    const f = onBed ? 0 : Math.min(1, (dist - bedBack) / Math.max(reach, 1e-6));   // free-edge progress 0..1
+    const f = onBed ? 0 : Math.min(1, (dist - bedBack) / Math.max(reach, 1e-6));
     const wMul = shape.natural ? 1 : shape.taper(f);
-    // cuticle: the base corners round off over the first 8% of the plate
     const baseRound = Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, 1 - v / 0.08), 2)));
-    for (let c = 0; c < NU; c++) {
-      const u = (c / (NU - 1)) * 2 - 1;            // -1..1 across the plate
-      // the end of the plate at this lateral position, as distance from the base
-      const endAt = bedBack + reach * Math.min(1, Math.max(0, shape.edge(u)));
-      const here = Math.min(dist, endAt);          // columns shorter than this row pile onto their end: that carves the silhouette
-      const x = fr.xc + u * halfW * wMul * Math.max(0.3, baseRound);
-      const y = fr.tip - bedBack + here;
-      // height: draped on the measured skin over the bed, then along the fitted bed line past the tip
-      const zSkin = dorsalHeight(fr, x, Math.min(y, fr.tip));
-      let z = zSkin;
-      if (y > fr.tip - 0.0035) {
-        const zLine = fr.bed.z + fr.bed.slope * (y - fr.tip);
-        z = zSkin + (zLine - zSkin) * smooth(fr.tip - 0.0035, fr.tip - 0.0005, Math.min(y, fr.tip));
-      }
-      const dome = 0.00055 * (1 - u * u);          // nails curve across
-      verts.push(x, y, fr.s * (z + lift + dome));
-    }
+    const endAt = bedBack + reach * Math.min(1, Math.max(0, shape.edge(u)));
+    const here = Math.min(dist, endAt);
+    const x = fr.xc + u * halfW * wMul * Math.max(0.3, baseRound);
+    const y = fr.tip - bedBack + here;
+    const z = topZ(u, y) - (side ? thickAt(v) : 0);
+    return [x, y, fr.s * z];
+  };
+  const N = NU * NV;
+  for (let r = 0; r < NV; r++) for (let c = 0; c < NU; c++) {
+    verts.push(...pointAt(r, c, 0));              // top block
   }
+  for (let r = 0; r < NV; r++) for (let c = 0; c < NU; c++) {
+    verts.push(...pointAt(r, c, 1));              // bottom block
+  }
+  const quad = (a, b, c, d, flip) => {
+    if (flip) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+  };
   for (let r = 0; r < NV - 1; r++) for (let c = 0; c < NU - 1; c++) {
     const a = r * NU + c, b = a + 1, d = a + NU, e = d + 1;
-    if (fr.s > 0) idx.push(a, d, b, b, d, e); else idx.push(a, b, d, b, e, d);
+    if (fr.s > 0) { idx.push(a, d, b, b, d, e); idx.push(N + a, N + b, N + d, N + b, N + e, N + d); }
+    else { idx.push(a, b, d, b, e, d); idx.push(N + a, N + d, N + b, N + b, N + d, N + e); }
   }
+  // rim: stitch the solid closed — both lateral edges, the free edge, the cuticle
+  const rim = (i0, i1) => {                        // top i0 -> bottom i0 pair strip
+    const j0 = N + i0, j1 = N + i1;
+    if (fr.s > 0) idx.push(i0, i1, j0, i1, j1, j0);
+    else idx.push(i0, j0, i1, i1, j0, j1);
+  };
+  for (let r = 0; r < NV - 1; r++) { rim(r * NU, (r + 1) * NU); rim((r + 1) * NU - 1, (r + 2) * NU - 1); }
+  for (let c = 0; c < NU - 1; c++) { rim((NV - 1) * NU + c, (NV - 1) * NU + c + 1); rim(c, c + 1); }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
   geo.setIndex(idx);

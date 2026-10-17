@@ -46,6 +46,18 @@ for (const [bn, fn] of Object.entries(G.distal)) {
       h[iy*NX+ix] = den ? num / den : NaN;
     }
   }
+  // the plate lies on the dorsal top arc: at the lateral folds it can dip a
+  // little, but never wrap the finger's side wall. clamp each row's edge
+  // heights to at most 1.2mm below the row's centre height (the side-wall
+  // verts otherwise leak in and the plate drapes around the finger).
+  const cc0 = Math.round((NX - 1) / 2);
+  for (let iy = 0; iy < NY; iy++) {
+    const hC = h[iy*NX+cc0];
+    if (Number.isNaN(hC)) continue;
+    for (let ix = 0; ix < NX; ix++) {
+      if (!Number.isNaN(h[iy*NX+ix])) h[iy*NX+ix] = Math.max(h[iy*NX+ix], hC - 0.0012);
+    }
+  }
   // fill any empty rows from their neighbours
   for (let pass = 0; pass < 60; pass++) {
     let holes = 0;
@@ -73,7 +85,7 @@ for (const [bn, fn] of Object.entries(G.distal)) {
   const slope = (cnt * sxy - sx * sy) / (cnt * sxx - sx * sx);
   const bedZ = (sy - slope * sx) / cnt;                 // dorsal height of the bed line at the tip's y
   const r = (v) => Math.round(v * 1e6) / 1e6;
-  out[fn] = { s, tip: r(tip), xc: r(xc), w: r(w), bed: { z: r(bedZ), slope: r(slope) },
+  out[fn] = { s, tip: r(tip), xc: r(xc), w: r(w), phal: r(tip - Math.min(...pts.map((p) => p[1]))), bed: { z: r(bedZ), slope: r(slope) },
     grid: { y0: r(y0), dy: r(dy), x0: r(x0), dx: r(dx), nx: NX, ny: NY, h: Array.from(h, r) } };
   const at = (mmBack, xf) => (h[Math.round((REACH - mmBack/1000) / dy) * NX + Math.round(xf * (NX - 1))] * 1000).toFixed(1);
   console.log(fn.padEnd(7), "s", s, "half-width", (w*1000).toFixed(1) + "mm",
