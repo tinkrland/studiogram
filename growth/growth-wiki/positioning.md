@@ -40,6 +40,23 @@ ticket. studiogram keeps the roles separate the way a stage does, so
 changing the set never re-rolls the talent, and re-posing never re-rolls
 the product.
 
+## you are the photographer
+
+the interaction model is direction, not prompting. want a different
+angle? move the camera, mid-take if you like. want the hand turned?
+drag the pose slider, the way you would ask a model to tilt their wrist.
+the studio answers in the same frame, not after a generation round trip.
+
+the economics follow from the code: the only network calls are asset
+loads (your mesh, the rigged hand, the bust). every render is local
+gpu work, so a retake, a crop change, or a full re-pose costs nothing
+and waits for nothing. a diffusion tool bills and waits per
+generation, and every one of those bills was a lottery ticket.
+
+this is why the studio is useful even fully decoupled from any
+platform: it is a self-contained workplace. the photographer brings
+a mesh and leaves with a shoot.
+
 ## what it is against
 
 the 2026 on-model category (welpix, fititon, neuroviz, tashvi, photta) takes
