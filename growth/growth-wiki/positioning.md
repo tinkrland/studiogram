@@ -6,6 +6,32 @@ studiogram is a virtual photo studio that renders the exact mesh that goes
 to manufacturing, on a rigged hand you can pose, dress, and recast at will:
 no diffusion model ever touches the product.
 
+## the studio has roles, not a prompt
+
+the product is organized the way a real photo studio is organized, and
+each concern is a separate system with its own state:
+
+- the talent: the rigged hand or bust, with skin tone, body hair, 19 nail
+  shapes, tattoo ink painted into the texture, and seven blend-target
+  morphs. a hand model and wardrobe department in one subject panel.
+- the set: backdrop and scene, switchable mid-take on video, never frozen
+  behind the subject.
+- the arrangement: every piece is an independent object at a named seat
+  (finger, wrist, ear lobe, nose), stacking along the limb, following the
+  pose. this is the prop system in its first form; a curated prop library
+  is a declared later phase in the code itself, and the arrangement seats
+  are exactly where those props will land.
+- the lighting rig and the camera: separate panels, camera-owned depth of
+  field, framing changeable mid-take.
+- the output: photos and video from the same scene state. captures are
+  creator outputs with provenance records; retakes are byte-identical.
+
+this is why the studio metaphor is structural, not decorative. a
+diffusion tool folds all of these into one prompt and gives you a lottery
+ticket. studiogram keeps the roles separate the way a stage does, so
+changing the set never re-rolls the talent, and re-posing never re-rolls
+the product.
+
 ## what it is against
 
 the 2026 on-model category (welpix, fititon, neuroviz, tashvi, photta) takes
