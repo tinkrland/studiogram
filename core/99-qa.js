@@ -71,6 +71,35 @@ async function runSelfTest() {
     camera.position.set(...S.live.position); controls.target.set(...S.live.target);
   }
 
+  // props: set dressing renders as scene objects with provenance in state
+  {
+    S.props = [
+      { id: "pt1", prop: "ottoman", x: 300, z: -400, rotY: 15, scale: 1.2, provenance: { source: "authored placeholder", method: "procedural", ts: "2026-10-17T00:00:00Z" } },
+      { id: "pt2", prop: "vase", x: -350, z: -300, rotY: 0, scale: 1, provenance: { source: "authored placeholder", method: "procedural", ts: "2026-10-17T00:00:00Z" } }
+    ];
+    applyProps();
+    const group = scene.getObjectByName("props");
+    const placed = group ? group.children.filter((c) => (c.name || "").startsWith("prop_")) : [];
+    let meshes = 0;
+    if (group) group.traverse((o) => { if (o.isMesh) meshes++; });
+    results.push("props render as scene objects: " + (placed.length === 2 && meshes === 3) + " (" + placed.length + " placed, " + meshes + " meshes: ottoman 2 + vase 1)");
+    // clamps: a prop cannot be dragged toward the stage
+    S.props[0].z = 50; S.props[0].scale = 9;
+    applyProps();
+    const clamped = S.props[0].z <= -180 && S.props[0].scale <= 2;
+    results.push("props clamp to the backdrop band (z " + S.props[0].z + ", scale " + S.props[0].scale.toFixed(2) + "): " + clamped);
+    // state round-trip: provenance travels
+    const propsJson = JSON.stringify(S.props.map((q) => ({ ...q })));
+    const restoredProps = JSON.parse(propsJson);
+    results.push("props serialize with provenance: " + (restoredProps.length === 2 && restoredProps[0].provenance.method === "procedural"));
+    S.props = [];
+    applyProps();
+    let remaining = 0;
+    const g2 = scene.getObjectByName("props");
+    if (g2) g2.traverse((o) => { if (o.isMesh) remaining++; });
+    results.push("props clear with state: " + (remaining === 0));
+  }
+
   // stacking: a second piece at the same location auto-stacks, then a reorder
   // must exchange the two seat offsets exactly
   const first = S.jewelry[0];

@@ -10,7 +10,7 @@ function renderScenePanel() {
   }
   subj.appendChild(srow);
   const env = section(PANEL, "environment");
-  hint(env, "plain backdrops for the first pass. the curated prop library is a later phase and is not part of this build.");
+  hint(env, "plain backdrops with free color values.");
   const sw = el("div", "swatches");
   for (const [name, b] of Object.entries(BACKDROPS)) {
     // a preset is on only while the live values equal it: editing the values
@@ -34,6 +34,34 @@ function renderScenePanel() {
     envRows.appendChild(row);
   }
   env.appendChild(envRows);
+
+  const props = section(PANEL, "props");
+  hint(props, "set dressing as real scene objects: placed into the backdrop, saved in scene state with per-prop provenance, rendered identically every time. background only — never worn, never attached to the subject. the platform's curated sam-3d library will feed this later; until then the entries are authored placeholder geometry.");
+  const prow = el("div", "btnrow");
+  for (const [kind, def] of Object.entries(PROP_LIBRARY)) {
+    button(prow, "+ " + def.label, "btn", () => addProp(kind));
+  }
+  props.appendChild(prow);
+  for (const p of S.props) {
+    const def = PROP_LIBRARY[p.prop];
+    if (!def) continue;
+    const row = el("div", "row");
+    row.appendChild(el("label", null, def.label));
+    const mk = (min, max, step, val,fn, title) => {
+      const i = document.createElement("input"); i.type = "range";
+      i.min = min; i.max = max; i.step = step; i.value = val; i.title = title;
+      i.addEventListener("input", () => { fn(+i.value); clampProp(p); applyProps(); saveState(); });
+      return i;
+    };
+    row.append(
+      mk(-800, 800, 10, p.x, (v) => p.x = v, "x"),
+      mk(-900, -180, 10, p.z, (v) => p.z = v, "depth"),
+      mk(0, 360, 5, p.rotY, (v) => p.rotY = v, "rotation"),
+      mk(0.4, 2, 0.05, p.scale, (v) => p.scale = v, "scale")
+    );
+    button(row, "remove", "btn danger", () => removeProp(p.id));
+    props.appendChild(row);
+  }
 
   const gate = section(PANEL, "provenance gate");
   hint(gate, "releases entered this scene by reference: id, version, asset hash. every entry below was re-hashed on arrival. the ingestion gate exists for visual reliability and provenance only, never as a castability, safety, or quality claim about a product.");

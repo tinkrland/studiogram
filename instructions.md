@@ -79,6 +79,13 @@ invariants, which this build must keep:
   tattoos); porcelain or skin finish. nails are real geometry: a plate
   per fingertip, shape picked from a 19-shape library, then a length
   slider (natural ignores length); polish tints the plate itself.
+- props: set dressing as real scene objects (setdesign/93-props.js).
+  library entries are authored placeholders (ottoman, mug, book stack,
+  vase) standing in for the platform's future sam-3d curated library,
+  the same stand-in pattern as the jewelry fixtures. props are placed
+  into the backdrop band (z clamped behind the stage, never
+  product-adjacent), carry per-prop provenance in scene state, rebuild
+  idempotently from state, and serialize with it.
 - jewelry: release records now carry their compiled mesh (a glb embedded as
   a data-uri plus a sha-256 over the glb bytes). the scene renders the
   compiled mesh through GLTFLoader: what is shown is what is manufactured.

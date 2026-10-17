@@ -10,7 +10,7 @@ root = pathlib.Path(".")
 manifest = [
     "core/02-core.js", "core/03-registry-state.js",
     "core/40-render.js", "lighting/41-lighting.js", "setdesign/42-backdrops.js",
-    "core/43-render-composite.js", "camera/45-camera-modes.js",
+    "core/43-render-composite.js", "camera/45-camera-modes.js", "setdesign/93-props.js",
     "customized-hands/50-model.js", "customized-hands/52-morphology.js",
     "customized-hands/53-nails.js", "customized-hands/54-surface.js", "customized-hands/56-tattoos.js",
     "bust/50-bust-model.js", "bust/53-ear-seats.js", "bust/54-necklace.js",

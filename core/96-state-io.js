@@ -40,6 +40,11 @@ async function applyFullState(raw, opts = {}) {
   if (st.hand) st.hand.skin = migrateSkin(st.hand.skin); // pre-preset saves carried skin.tone
   st.subject = st.subject === "bust" ? "bust" : "hand"; // pre-bust saves stay on the hand
   st.bust = migrateBust(st.bust);
+  // props: background set dressing with per-prop provenance; unknown kinds
+  // (library entries the running artifact doesn't carry) drop out
+  st.props = (Array.isArray(st.props) ? st.props : [])
+    .filter((p) => p && PROP_LIBRARY[p.prop] && typeof p.id === "string")
+    .map((p) => ({ ...clampProp(p) }));
   // photos: pull thumbs into memory, keep the rest as values
   for (const c of st.photos || []) {
     if (c.thumb) { CAPTURE_THUMBS.set(c.id, c.thumb); delete c.thumb; }

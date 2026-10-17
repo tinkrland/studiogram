@@ -151,6 +151,7 @@ function defaultState() {
     bust: defaultBust(),
     pose: defaultPose(),
     jewelry: [],
+  props: [],
     lighting: defaultLights(),
     environment: { ...BACKDROPS.warm_gray, preset: "warm_gray" }, // bg/center are the values that render; a preset is a prefill, not a path
     live: { mode: "orbit", position: [140, 260, 460], target: [-15, 100, 40], fov: 26, focallength: 50, focaldistance: 475 },

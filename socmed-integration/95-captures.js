@@ -124,6 +124,20 @@ async function applyCoreState(core) {
 }
 
 // rebuilds every runtime object from state. the state is the truth.
+// the reset button's missing body, defined at last: fresh defaults, full
+// re-apply, storage flushed. captures are scene content here, so they go too.
+async function resetScene() {
+  S = defaultState();
+  CAPTURE_THUMBS.clear();
+  S.photos = []; S.sets = []; S.active_set = null;
+  SAVED_HANDS = []; S.cameras = defaultState().cameras;
+  try { localStorage.removeItem("studiogram_state"); localStorage.removeItem("studiogram_saved_hands"); } catch (e) {}
+  await syncSceneToState();
+  renderPanel(currentTab);
+  saveState();
+  toast("scene reset to defaults");
+}
+
 async function syncSceneToState() {
   await buildHand();
   if (S.subject === "bust" && !BUST.loaded && !BUST.loadError) {
@@ -135,6 +149,7 @@ async function syncSceneToState() {
   updateSubjectTabs();
   applyLighting();
   applyEnvironment();
+  applyProps();
   for (const inst of S.jewelry) await buildJewelryInstance(inst);
   camera.position.set(...S.live.position);
   controls.target.set(...S.live.target);

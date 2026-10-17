@@ -27,11 +27,16 @@ studio:
 - **set design** — separately, as it happens irl: six backdrop presets plus
   free-color composition, a three-light studio rig, the frame's environment
   is scene state, not baked pixels.
-- **props** (the next part) — 3d objects dropped into the backdrop as real
-  scene objects (segmented via sam 3d objects by meta), placed once and
-  authored like everything else. because a prop is geometry in the scene
-  and not a denoised guess, it literally cannot change between frames —
-  no drift, no melted logos, no five-finger hands.
+- **props** — 3d objects placed into the backdrop as real scene
+  objects: independent geometry, per-prop provenance in scene state
+  (source, method, timestamp), background-only placement, and the same
+  state renders the same backdrop every time. the platform's curated
+  library (sam 3d objects by meta ingestion, their pipeline) will feed
+  the placement system; authored placeholder entries stand in until it
+  exists, the same way jewelry fixtures stand in for release records.
+  because a prop is geometry in the scene and not a denoised guess, it
+  literally cannot change between frames — no drift, no melted logos,
+  no five-finger hands.
 - **the studio floor** — you are the photographer: live orbit, zoom and pan
   mid-take, pinned deterministic shots, five export framings (viewport,
   1:1, 4:5, 9:16, 16:9), photo sets and videos that re-render from their
@@ -81,6 +86,8 @@ the artifact byte-for-byte) plus its authored inputs and scripts.
 - `camera/` — free orbit, pinned deterministic shots, the lens trio
 - `lighting/` — the three-light studio rig + its panel
 - `setdesign/` — backdrops and scene composition + the scene panel
+- `setdesign/93-props.js` — the prop placement system: library entries,
+  state clamps, provenance, and the idempotent rebuild
 - `socmed-integration/` — the capture set: frame, reproduce, export
 - `core/` — shell, utils, state, registry fixtures, render composite,
   panels infra, state import/export, boot, the in-app qa hooks
